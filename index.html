@@ -108,7 +108,10 @@
         #fullscreen-footer { display:none; }
         #tv-stage.cinema { display:grid; grid-template-rows:minmax(0,9fr) minmax(0,1fr); width:100%; height:100%; border:0; border-radius:0; background:#000; }
         #tv-stage.cinema #video-area { width:100%; height:100%; aspect-ratio:auto; }
-        #tv-stage.cinema #youtube-player { pointer-events:none; }
+        /* Keep native YouTube controls clickable, including the Settings menu. */
+        #tv-stage.cinema #youtube-player { pointer-events:auto; }
+        .player-tools { margin-top:10px; }
+        #host-player-state { color:#c4b5fd; }
         #tv-stage.theater { position:fixed; inset:0; width:100vw; height:100vh; height:100dvh; z-index:80; }
         body.theater-open { overflow:hidden; }
         #tv-stage.cinema #fullscreen-footer { display:flex; align-items:center; gap:18px; padding:0 2vw; border-top:1px solid #553252; background:linear-gradient(100deg,#1e1230,#0f172a); min-width:0; min-height:0; overflow:hidden; }
@@ -191,7 +194,9 @@
                         <div class="fullscreen-actions">
                             <button onclick="skipSong()" title="ข้ามเพลง">กดปุ่ม <kbd>2</kbd> ข้ามเพลง</button>
                             <button onclick="restartSong()" title="เล่นเพลงปัจจุบันใหม่ตั้งแต่ต้น">กดปุ่ม <kbd>0</kbd> เล่นซ้ำ</button>
-                            <button class="fullscreen-extra" onclick="togglePlayPause()" aria-label="เล่นหรือหยุดชั่วคราว"><i class="fa-solid fa-play-pause" aria-hidden="true"></i></button>
+                            <button onclick="togglePlayPause()" aria-label="เล่นหรือหยุดชั่วคราว"><i class="fa-solid fa-play-pause" aria-hidden="true"></i></button>
+                            <button onclick="reloadCurrentSong()" title="โหลดเพลงปัจจุบันใหม่เมื่อภาพหรือเครื่องเล่นค้าง">โหลดใหม่</button>
+                            <button onclick="focusTVControls()" title="คืนโฟกัสให้หน้าเว็บเพื่อใช้ปุ่ม 2 / 0">ใช้ปุ่ม 2/0</button>
                             <button onclick="toggleFullscreen()" aria-label="ออกจากเต็มจอ">ออก</button>
                         </div>
                     </div>
@@ -210,7 +215,12 @@
                         </div>
                     </div>
                     <p class="shortcut-help">รีโมททีวี / คีย์บอร์ด: <kbd>2</kbd> ข้ามเพลง · <kbd>0</kbd> เล่นซ้ำตั้งแต่ต้น · <kbd>F</kbd> เต็มจอ · <kbd>Esc</kbd> ออกจากเต็มจอ</p>
-                    <p class="tiny muted">ใช้ปุ่มเต็มจอของแอปเพื่อแสดงคิวเพลง · ปุ่มตัวเลขขึ้นอยู่กับการรองรับของเบราว์เซอร์ทีวี</p>
+                    <p class="tiny muted">คลิกรูปเฟืองใน YouTube เพื่อตั้งค่าได้ทั้งหน้าปกติและเต็มจอ หลังใช้เมนู YouTube ให้กด “ใช้ปุ่ม 2/0” เพื่อคืนโฟกัสก่อนใช้รีโมทตัวเลข</p>
+                    <div class="row wrap player-tools">
+                        <span id="host-player-state" class="tiny" role="status">สถานะ: ยังไม่มีเพลง</span>
+                        <button class="tiny" onclick="reloadCurrentSong()">โหลดเครื่องเล่นใหม่เมื่อค้าง</button>
+                        <button class="tiny" onclick="focusTVControls()">ใช้ปุ่ม 2/0</button>
+                    </div>
                     <div id="player-notice" hidden role="status"></div>
                 </div>
 
@@ -325,7 +335,8 @@
         mode:null, roomId:null, peer:null, connections:[], hostConn:null,
         queue:[], currentSong:null, youtubePlayer:null, playerReady:false,
         apiKey:readKey(), revision:0, connectTimer:null, roomAttempts:0,
-        toastTimer:null, shortcutTime:0, lastFocus:null, pendingAdds:new Map()
+        toastTimer:null, shortcutTime:0, lastFocus:null, pendingAdds:new Map(),
+        playbackTimer:null, resumeAt:0, playerStateText:'ยังไม่มีเพลง'
     };
     const SEARCH = {
         host:{timer:null, controller:null, version:0, composing:false},
@@ -396,11 +407,15 @@
             events:{
                 onReady:() => {
                     APP.playerReady = true;
-                    APP.youtubePlayer.getIframe().setAttribute('tabindex','-1');
-                    if (APP.currentSong) APP.youtubePlayer.loadVideoById(APP.currentSong.id);
+                    APP.youtubePlayer.getIframe().setAttribute('tabindex','0');
+                    APP.youtubePlayer.getIframe().setAttribute('title','YouTube — เล่นเพลงและตั้งค่า');
+                    if (APP.currentSong) loadCurrentVideo(APP.resumeAt);
+                    APP.resumeAt = 0;
                 },
                 onStateChange:onPlayerStateChange,
                 onError:event => {
+                    clearTimeout(APP.playbackTimer);
+                    setPlaybackStatus('เล่นไม่สำเร็จ — รหัส ' + event.data);
                     const messages = {
                         2:'Video ID ไม่ถูกต้อง', 5:'เครื่องเล่น HTML5 ไม่สามารถเล่นวิดีโอนี้ได้',
                         100:'วิดีโอนี้ถูกลบหรือเป็นวิดีโอส่วนตัว',
@@ -410,18 +425,70 @@
                     };
                     playerNotice((messages[event.data] || 'เล่นวิดีโอไม่สำเร็จ') + ' — เลือกข้ามเพลงเพื่อไปเพลงถัดไป');
                 },
-                onAutoplayBlocked:() => playerNotice('เบราว์เซอร์บล็อกการเล่นอัตโนมัติ กรุณากดปุ่มเล่นบนหน้าจอทีวีก่อน')
+                onAutoplayBlocked:() => {
+                    clearTimeout(APP.playbackTimer);
+                    setPlaybackStatus('รอให้กดเล่น — เบราว์เซอร์บล็อกเล่นอัตโนมัติ');
+                    playerNotice('เบราว์เซอร์บล็อกการเล่นอัตโนมัติ กรุณากดปุ่มเล่นบนหน้าจอทีวีหรือแถบเต็มจอ');
+                }
             }
         });
     }
+    function setPlaybackStatus(text) {
+        APP.playerStateText = text;
+        $('host-player-state').textContent = 'สถานะ: ' + text;
+        renderFullscreenQueue();
+    }
+    function focusTVControls() {
+        // Keyboard events inside a cross-origin iframe do not bubble to this document.
+        // Restore focus only on explicit request or song changes, never while using Settings.
+        if (APP.mode === 'host') $('tv-stage').focus({preventScroll:true});
+    }
+    function loadCurrentVideo(startSeconds = 0) {
+        if (!APP.playerReady || !APP.currentSong) return;
+        clearTimeout(APP.playbackTimer);
+        const queueId = APP.currentSong.queueId;
+        setPlaybackStatus('กำลังโหลดเพลง…');
+        APP.youtubePlayer.loadVideoById({videoId:APP.currentSong.id,startSeconds});
+        // One bounded check only: never repeatedly force play over a user's pause/Settings.
+        APP.playbackTimer = setTimeout(() => {
+            if (!APP.playerReady || !APP.currentSong || APP.currentSong.queueId !== queueId) return;
+            const state = APP.youtubePlayer.getPlayerState();
+            if (state === YT.PlayerState.PLAYING || state === YT.PlayerState.ENDED) return;
+            setPlaybackStatus(state === YT.PlayerState.BUFFERING ? 'กำลังบัฟเฟอร์ — ตรวจสอบอินเทอร์เน็ต' : 'ยังไม่เริ่มเล่น — กดเล่น หรือโหลดใหม่หากค้าง');
+            playerNotice('เพลงยังไม่เริ่มเล่น ให้กดเล่นก่อน หากภาพหรือไอคอนค้างให้กด “โหลดใหม่”');
+        },12000);
+    }
+    function reloadCurrentSong() {
+        if (APP.mode !== 'host' || !APP.currentSong) return;
+        clearTimeout(APP.playbackTimer);
+        let position = 0;
+        try { if (APP.playerReady) position = APP.youtubePlayer.getCurrentTime() || 0; } catch (_) {}
+        APP.resumeAt = Number.isFinite(position) ? Math.max(0,position) : 0;
+        APP.playerReady = false;
+        if (APP.youtubePlayer) { try { APP.youtubePlayer.destroy(); } catch (_) {} }
+        APP.youtubePlayer = null;
+        // Recreate only the iframe, keeping the fullscreen stage and queue intact.
+        const previous = $('youtube-player'); if (previous) previous.remove();
+        const mount = document.createElement('div'); mount.id = 'youtube-player';
+        $('video-area').prepend(mount);
+        $('player-notice').hidden = true;
+        setPlaybackStatus('กำลังโหลดเครื่องเล่นใหม่…');
+        loadYouTubeIframeAPI();
+        focusTVControls();
+    }
     function onPlayerStateChange(event) {
-        if (event.data === YT.PlayerState.ENDED && APP.currentSong) playNextInQueue();
+        if (!APP.currentSong) { setPlaybackStatus('ยังไม่มีเพลง'); return; }
+        const labels = {'-1':'กำลังเตรียมเพลง','0':'เพลงจบแล้ว','1':'กำลังเล่น','2':'หยุดชั่วคราว','3':'กำลังบัฟเฟอร์','5':'รอเล่น'};
+        setPlaybackStatus(labels[event.data] || 'กำลังเตรียมเพลง');
         if (event.data === YT.PlayerState.PLAYING) {
+            clearTimeout(APP.playbackTimer);
             $('play-pause-icon').className = 'fa-solid fa-pause';
             $('player-notice').hidden = true;
         } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED || event.data === YT.PlayerState.CUED) {
             $('play-pause-icon').className = 'fa-solid fa-play';
+            if (event.data === YT.PlayerState.PAUSED) clearTimeout(APP.playbackTimer);
         }
+        if (event.data === YT.PlayerState.ENDED) playNextInQueue();
     }
     function togglePlayPause() {
         if (!APP.playerReady || !APP.currentSong) return;
@@ -435,14 +502,20 @@
     }
     function playNextInQueue() {
         if (APP.mode !== 'host') return;
+        clearTimeout(APP.playbackTimer);
+        APP.resumeAt = 0;
         APP.currentSong = APP.queue.shift() || null;
         $('player-placeholder').classList.toggle('hidden', !!APP.currentSong);
         $('host-now-playing-title').textContent = APP.currentSong ? APP.currentSong.title : 'ยังไม่ได้เลือกเพลง';
         $('player-notice').hidden = true;
+        setPlaybackStatus(APP.currentSong ? 'กำลังโหลดเพลง…' : 'ยังไม่มีเพลง');
         if (APP.playerReady) {
-            if (APP.currentSong) APP.youtubePlayer.loadVideoById(APP.currentSong.id);
+            if (APP.currentSong) loadCurrentVideo();
             else { APP.youtubePlayer.stopVideo(); $('play-pause-icon').className = 'fa-solid fa-play'; }
         }
+        // A prior click inside YouTube must not keep consuming the TV's numeric keys.
+        const active = document.activeElement;
+        if (active === $('youtube-player') || (active && $('tv-stage').contains(active))) focusTVControls();
         commitState();
     }
     function skipSong() { if (APP.mode === 'host') playNextInQueue(); }
@@ -490,7 +563,7 @@
         requestAnimationFrame(updateQueueMarquee);
     }
     function renderFullscreenQueue() {
-        $('fullscreen-current').textContent = APP.currentSong ? 'กำลังเล่น: ' + APP.currentSong.title : 'ยังไม่ได้เลือกเพลง';
+        $('fullscreen-current').textContent = APP.currentSong ? APP.playerStateText + ': ' + APP.currentSong.title : 'ยังไม่ได้เลือกเพลง';
         const text = APP.queue.length ? 'คิวถัดไป (' + APP.queue.length + '):  ' + APP.queue.map((song,i) => (i+1) + '. ' + song.title).join('   •   ') : 'คิวถัดไป: ไม่มีเพลงในคิว';
         $('fullscreen-queue-text').textContent = text; $('fullscreen-queue-copy').textContent = text;
         requestAnimationFrame(updateQueueMarquee);
