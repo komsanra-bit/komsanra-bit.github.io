@@ -3,877 +3,876 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remote Karaoke - ระบบคาราโอเกะเชื่อมต่อรีโมท</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PeerJS for Real-time WebRTC P2P (No backend server required) -->
+    <meta name="theme-color" content="#0f172a">
+    <title>Remote Karaoke — TV & Mobile Remote</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <!-- QRCode.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
     <style>
-        body {
-            font-family: 'Kanit', sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
+        :root { color-scheme: dark; --bg:#0f172a; --line:#334155; --muted:#94a3b8; --pink:#f472b6; }
+        * { box-sizing:border-box; }
+        body { margin:0; background:var(--bg); color:#f8fafc; font-family:'Kanit',sans-serif; }
+        button,input,summary { font:inherit; }
+        button { cursor:pointer; }
+        button:disabled { opacity:.35; cursor:not-allowed; }
+        button,a,input,summary { -webkit-tap-highlight-color:transparent; }
+        button:focus-visible,a:focus-visible,summary:focus-visible { outline:3px solid #fbbf24; outline-offset:3px; }
+        input:focus { outline:2px solid var(--pink); outline-offset:1px; }
+        button { color:inherit; background:#263449; border:1px solid #42506a; border-radius:12px; padding:10px 14px; transition:background .15s; }
+        button:hover:not(:disabled) { background:#3c4b65; }
+        input { min-width:0; width:100%; color:#f8fafc; background:#0b1222; border:1px solid var(--line); border-radius:12px; padding:12px; }
+        input::placeholder { color:#7c8aa2; }
+        h1,h2,h3,h4,p { margin:0; }
+        a { color:#c4b5fd; }
+        .hidden,[hidden] { display:none !important; }
+        .glass { background:rgba(30,41,59,.8); border:1px solid rgba(148,163,184,.2); border-radius:20px; }
+        .muted { color:var(--muted); }
+        .small { font-size:13px; }
+        .tiny { font-size:11px; }
+        .pink { color:var(--pink); }
+        .row { display:flex; align-items:center; gap:10px; }
+        .between { justify-content:space-between; }
+        .wrap { flex-wrap:wrap; }
+        .grow { flex:1; min-width:0; }
+        .stack { display:flex; flex-direction:column; gap:16px; min-width:0; }
+        .pad { padding:18px; }
+        .truncate { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+        .primary { background:linear-gradient(100deg,#db2777,#9333ea); border-color:#b544bd; }
+        .primary:hover:not(:disabled) { background:linear-gradient(100deg,#be185d,#7e22ce); }
+        .secondary { background:#4338ca; border-color:#6366f1; }
+        .danger { color:#fda4af; }
+        .icon-button { min-width:42px; min-height:42px; padding:9px; }
+        header { position:sticky; top:0; z-index:20; padding:12px 20px; background:rgba(15,23,42,.96); border-bottom:1px solid #263449; }
+        .brand { border:0; background:none; text-align:left; padding:0; }
+        .brand:hover:not(:disabled) { background:none; }
+        .brand-icon { width:42px; height:42px; display:grid; place-items:center; background:linear-gradient(45deg,#ec4899,#6366f1); border-radius:13px; font-size:22px; }
+        h1 { font-size:20px; color:#f9a8d4; line-height:1.2; }
+        main { width:min(1380px,100%); margin:auto; padding:24px; }
+        #screen-landing { max-width:800px; margin:7vh auto; text-align:center; }
+        .badge { display:inline-block; color:#f9a8d4; background:#83184333; border:1px solid #9d174d; padding:5px 12px; border-radius:99px; font-size:12px; }
+        .hero-title { font-size:clamp(28px,4.5vw,48px); line-height:1.25; margin:20px 0; }
+        .gradient { background:linear-gradient(90deg,#f472b6,#c4b5fd,#818cf8); background-clip:text; -webkit-background-clip:text; color:transparent; }
+        .mode-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:30px; }
+        .mode-card { padding:28px; text-align:left; border-color:#a855f755; background:#1e293b; display:flex; flex-direction:column; gap:15px; }
+        .mode-card i { font-size:32px; color:#f9a8d4; }
+        .mode-card strong { font-size:21px; }
+        #screen-host { display:grid; grid-template-columns:minmax(0,2fr) minmax(300px,1fr); gap:20px; }
+        #screen-remote { max-width:760px; margin:auto; }
+        #tv-stage { background:#000; border:1px solid #334155; border-radius:18px; overflow:hidden; position:relative; outline:none; }
+        #video-area { position:relative; width:100%; aspect-ratio:16/9; background:#000; min-height:0; }
+        #youtube-player { width:100%; height:100%; display:block; border:0; }
+        #player-placeholder { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px; padding:24px; text-align:center; background:#080e1c; }
+        #player-placeholder i { color:var(--pink); font-size:48px; }
+        #player-placeholder h3 { font-size:24px; }
+        .controls { padding:15px; }
+        .controls-title { min-width:140px; }
+        .control-actions { gap:7px; }
+        .shortcut-help { color:#cbd5e1; font-size:12px; margin-top:10px; line-height:1.8; }
+        kbd { display:inline-block; font:600 12px monospace; border:1px solid #64748b; border-bottom-width:3px; padding:1px 6px; border-radius:5px; color:#fef3c7; background:#1e293b; }
+        .section-title { display:flex; align-items:center; gap:8px; font-size:16px; }
+        .search-form { display:flex; gap:8px; margin-top:12px; }
+        .search-form input { flex:1; }
+        .search-hint { margin:8px 0; line-height:1.6; }
+        details { margin-top:12px; }
+        summary { cursor:pointer; color:#cbd5e1; }
+        .direct-row { margin-top:10px; display:flex; gap:8px; }
+        .results-panel { margin-top:14px; border-top:1px solid #334155; padding-top:12px; }
+        .search-results { max-height:390px; overflow-y:auto; margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+        .song-card { padding:9px; background:#33415566; border:1px solid #47556966; border-radius:12px; display:flex; align-items:center; gap:10px; }
+        .song-card img { width:76px; height:51px; object-fit:cover; border-radius:7px; flex-shrink:0; background:#0f172a; }
+        .song-title { font-size:13px; font-weight:500; }
+        .song-subtitle { font-size:11px; color:var(--muted); margin-top:3px; }
+        .song-add { flex-shrink:0; padding:9px 12px; font-size:12px; }
+        .queue { display:flex; flex-direction:column; gap:8px; max-height:530px; overflow-y:auto; margin-top:14px; }
+        .queue .song-card img { width:52px; height:39px; }
+        .queue-actions { display:flex; gap:3px; flex-shrink:0; }
+        .queue-actions button { padding:7px; min-width:32px; min-height:34px; font-size:12px; border:0; background:transparent; }
+        .queue-index { color:var(--pink); font:600 12px monospace; width:20px; text-align:center; flex-shrink:0; }
+        .count { color:#f9a8d4; background:#0f172a; font-size:12px; padding:4px 10px; border-radius:99px; }
+        .empty { text-align:center; color:#94a3b8; padding:28px 12px; font-size:13px; }
+        .room-code { color:#f472b6; font:800 36px monospace; letter-spacing:5px; margin:8px 0; }
+        .status { display:flex; align-items:center; gap:7px; font-size:12px; color:#fbbf24; }
+        .status::before { content:''; width:8px; height:8px; border-radius:50%; background:currentColor; flex-shrink:0; }
+        .status.online { color:#34d399; }
+        .status.offline { color:#fb7185; }
+        .now-remote { margin-top:14px; padding:12px; border:1px solid #ec489955; background:#83184322; border-radius:12px; }
+        .modal { position:fixed; inset:0; z-index:100; background:#000c; display:flex; align-items:center; justify-content:center; padding:20px; overflow-y:auto; }
+        .modal-card { width:min(480px,100%); padding:24px; box-shadow:0 20px 80px #0008; max-height:90vh; overflow-y:auto; }
+        .modal-card p { font-size:13px; color:#cbd5e1; line-height:1.7; }
+        .modal-card input { margin:16px 0; }
+        .modal-card ol { padding-left:24px; font-size:12px; color:#94a3b8; line-height:1.8; }
+        #room-code-input { text-align:center; font:700 28px monospace; letter-spacing:8px; color:var(--pink); }
+        #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:200; padding:12px 20px; border:1px solid #64748b; border-radius:14px; background:#1e293bf5; box-shadow:0 8px 40px #0008; max-width:90vw; width:max-content; font-size:13px; pointer-events:none; }
+        #player-notice { margin-top:12px; color:#fcd34d; padding:12px; border:1px solid #a16207; border-radius:12px; font-size:13px; }
+        /* Fullscreen the entire stage, not the cross-origin player. The footer has its own 10% row. */
+        #fullscreen-footer { display:none; }
+        #tv-stage.cinema { display:grid; grid-template-rows:minmax(0,9fr) minmax(0,1fr); width:100%; height:100%; border:0; border-radius:0; background:#000; }
+        #tv-stage.cinema #video-area { width:100%; height:100%; aspect-ratio:auto; }
+        #tv-stage.cinema #youtube-player { pointer-events:none; }
+        #tv-stage.theater { position:fixed; inset:0; width:100vw; height:100vh; height:100dvh; z-index:80; }
+        body.theater-open { overflow:hidden; }
+        #tv-stage.cinema #fullscreen-footer { display:flex; align-items:center; gap:18px; padding:0 2vw; border-top:1px solid #553252; background:linear-gradient(100deg,#1e1230,#0f172a); min-width:0; min-height:0; overflow:hidden; }
+        .fullscreen-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:.4vh; }
+        #fullscreen-current { font-size:clamp(10px,1.65vh,22px); color:#f9a8d4; }
+        #fullscreen-queue-window { overflow:hidden; width:100%; font-size:clamp(11px,2vh,27px); }
+        #fullscreen-queue-track { display:flex; width:max-content; }
+        #fullscreen-queue-track span { white-space:nowrap; }
+        #fullscreen-queue-track.running { animation:queue-scroll var(--scroll-duration,30s) linear infinite; }
+        #fullscreen-queue-track.running span { padding-right:5vw; }
+        @keyframes queue-scroll { to { transform:translateX(-50%); } }
+        .fullscreen-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+        .fullscreen-actions button { font-size:clamp(10px,1.6vh,20px); padding:.6vh .7vw; border-radius:8px; line-height:1.4; }
+        .fullscreen-actions kbd { font-size:inherit; }
+        @media(prefers-reduced-motion:reduce) { #fullscreen-queue-track.running { animation:none; } #fullscreen-queue-window { overflow-x:auto; } }
+        @media(max-width:1050px) { #screen-host { grid-template-columns:1fr; } .queue { max-height:360px; } }
+        @media(max-width:620px) {
+            main { padding:14px; } header { padding:12px; } h1 { font-size:16px; }
+            .brand .tiny { display:none; } .mode-grid { grid-template-columns:1fr; } .mode-card { padding:22px; }
+            .pad { padding:14px; } .controls { align-items:stretch; } .control-actions { flex-wrap:wrap; }
+            .song-card { gap:7px; } .song-card img { width:57px; height:42px; } .song-add { padding:8px; }
+            .queue-actions button { min-width:28px; padding:6px; }
+            #tv-stage.cinema #fullscreen-footer { gap:7px; padding:0 1vw; }
+            .fullscreen-actions { gap:3px; } .fullscreen-actions button { padding:.4vh 4px; }
+            .fullscreen-extra { display:none; }
         }
-        .glass {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .glass-card {
-            background: rgba(51, 65, 85, 0.5);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .neon-border {
-            box-shadow: 0 0 15px rgba(236, 72, 153, 0.3);
-        }
-        .neon-glow-yellow {
-            box-shadow: 0 0 15px rgba(234, 179, 8, 0.3);
-        }
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
-        }
+        ::-webkit-scrollbar { width:6px; height:6px; }
+        ::-webkit-scrollbar-track { background:#0f172a; }
+        ::-webkit-scrollbar-thumb { background:#475569; border-radius:5px; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between selection:bg-pink-500 selection:text-white">
-
-    <!-- NAVIGATION BAR -->
-    <header class="glass sticky top-0 z-50 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-3 cursor-pointer" onclick="goHome()">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                <i class="fa-solid font-black fa-microphone-lines"></i>
-            </div>
-            <div>
-                <h1 class="font-bold text-lg leading-none bg-gradient-to-r from-pink-400 via-purple-300 to-indigo-400 bg-clip-text text-transparent">Remote Karaoke</h1>
-                <p class="text-xs text-slate-400">ระบบร้องเพลงคาราโอเกะกับเพื่อน</p>
-            </div>
-        </div>
-
-        <div id="nav-actions" class="flex items-center gap-2">
-            <button onclick="openApiKeyModal()" class="px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1.5">
-                <i class="fa-solid fa-key text-amber-400"></i>
-                <span class="hidden sm:inline">ตั้งค่า</span> YouTube API Key
-            </button>
-        </div>
+<body>
+    <header class="row between">
+        <button class="brand row" onclick="goHome()" aria-label="กลับหน้าหลัก">
+            <span class="brand-icon"><i class="fa-solid fa-microphone-lines" aria-hidden="true"></i></span>
+            <span><h1>Remote Karaoke</h1><span class="tiny muted">ร้องเพลงบนทีวี · จัดคิวผ่านมือถือ</span></span>
+        </button>
+        <button onclick="openApiKeyModal()" class="small"><i class="fa-solid fa-key pink" aria-hidden="true"></i> YouTube API Key</button>
     </header>
-
-    <!-- MAIN CONTAINER -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 flex flex-col">
-
-        <!-- LANDING SCREEN (SELECT MODE) -->
-        <div id="screen-landing" class="my-auto flex flex-col items-center justify-center text-center py-10 space-y-8 max-w-2xl mx-auto">
-            <div class="space-y-3">
-                <span class="px-3 py-1 rounded-full text-xs font-medium bg-pink-500/10 text-pink-400 border border-pink-500/20">
-                    ✨ ไม่ต้องติดตั้ง Server · ใช้งานได้ทันที
-                </span>
-                <h2 class="text-3xl sm:text-5xl font-extrabold text-slate-100 tracking-tight">
-                    ปาร์ตี้คาราโอเกะกับเพื่อน <br><span class="bg-gradient-to-r from-pink-500 via-purple-400 to-indigo-400 bg-clip-text text-transparent">ด้วยจอใหญ่ & มือถือรีโมท</span>
-                </h2>
-                <p class="text-slate-400 text-sm sm:text-base max-w-lg mx-auto">
-                    เปิดหน้าจอหลักบน TV หรือคอมพิวเตอร์ แล้วใช้มือถือสแกน QR Code เพื่อค้นหาเพลงและจัดคิวได้พร้อมกันหลายคน!
-                </p>
-            </div>
-
-            <!-- MODE CHOICES -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-                <!-- TV / HOST MODE BUTTON -->
-                <button onclick="startHostMode()" class="glass hover:bg-slate-800/80 p-6 rounded-2xl border border-pink-500/30 hover:border-pink-500/60 transition group text-left flex flex-col justify-between space-y-4 shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
-                        <i class="fa-solid fa-tv"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-slate-100 mb-1">เปิดหน้าจอหลัก (TV Host)</h3>
-                        <p class="text-xs text-slate-400">สำหรับจอ TV หรือคอมพิวเตอร์ สำหรับเปิดเล่นเพลงและแสดง QR Code ให้เพื่อนสแกน</p>
-                    </div>
-                    <div class="text-pink-400 font-medium text-sm flex items-center gap-1">
-                        เริ่มสร้างห้องคาราโอเกะ <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition"></i>
-                    </div>
+    <main>
+        <section id="screen-landing">
+            <span class="badge">✨ ไม่ต้องติดตั้งเซิร์ฟเวอร์ของตัวเอง</span>
+            <h2 class="hero-title">ปาร์ตี้คาราโอเกะกับเพื่อน<br><span class="gradient">ด้วยจอใหญ่ & มือถือรีโมท</span></h2>
+            <p class="muted">เปิดหน้าจอหลักบน TV หรือคอมพิวเตอร์ ค้นหาและเปิดเพลงได้ทันที<br>เพื่อนสามารถเปิดเว็บนี้บนมือถือ แล้วกรอกรหัสห้องเพื่อค้นหาเพลงและจัดคิวร่วมกัน</p>
+            <div class="mode-grid">
+                <button class="mode-card" onclick="startHostMode()">
+                    <i class="fa-solid fa-tv" aria-hidden="true"></i>
+                    <strong>เปิดหน้าจอหลัก (TV Host)</strong>
+                    <span class="muted small">ค้นหาเพลง เปิดเล่นบนจอใหญ่ และควบคุมด้วยปุ่มตัวเลขบนรีโมททีวี</span>
+                    <span class="pink small">สร้างห้องคาราโอเกะ →</span>
                 </button>
-
-                <!-- REMOTE MODE BUTTON -->
-                <button onclick="showConnectRemoteModal()" class="glass hover:bg-slate-800/80 p-6 rounded-2xl border border-indigo-500/30 hover:border-indigo-500/60 transition group text-left flex flex-col justify-between space-y-4 shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
-                        <i class="fa-solid fa-mobile-screen-button"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-slate-100 mb-1">เปิดมือถือรีโมท (Remote)</h3>
-                        <p class="text-xs text-slate-400">สำหรับควบคุม, ค้นหาเพลง YouTube, เพิ่มเพลงลงคิว และจัดลำดับจากมือถือของคุณ</p>
-                    </div>
-                    <div class="text-indigo-400 font-medium text-sm flex items-center gap-1">
-                        เชื่อมต่อเข้าห้องเดิม <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition"></i>
-                    </div>
+                <button class="mode-card" onclick="showConnectRemoteModal()">
+                    <i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
+                    <strong>เปิดมือถือรีโมท (Remote)</strong>
+                    <span class="muted small">ค้นหาเพลงพร้อมรายการแนะนำขณะพิมพ์ เพิ่มเพลง และจัดลำดับคิว</span>
+                    <span class="pink small">กรอกรหัสห้องเพื่อเชื่อมต่อ →</span>
                 </button>
             </div>
-        </div>
+            <p class="tiny muted" style="margin-top:20px">ต้องเชื่อมต่ออินเทอร์เน็ตสำหรับ YouTube และบริการเชื่อมต่อ PeerJS</p>
+        </section>
 
-        <!-- HOST SCREEN (TV MODE) -->
-        <div id="screen-host" class="hidden flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
-            
-            <!-- LEFT COLUMN: VIDEO PLAYER & CURRENT SONG CONTROLS -->
-            <div class="lg:col-span-8 flex flex-col space-y-4">
-                <!-- PLAYER CONTAINER -->
-                <div class="relative w-full bg-black rounded-2xl overflow-hidden aspect-video shadow-2xl border border-slate-800">
-                    <div id="youtube-player" class="w-full h-full"></div>
-                    
-                    <!-- EMPTY PLAYER OVERLAY -->
-                    <div id="player-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-center p-6 space-y-4">
-                        <div class="w-20 h-20 rounded-full bg-pink-500/10 text-pink-400 flex items-center justify-center text-4xl animate-pulse">
-                            <i class="fa-solid fa-music"></i>
+        <section id="screen-host" class="hidden" aria-label="หน้าจอทีวี">
+            <div class="stack">
+                <div id="tv-stage" tabindex="-1" aria-label="เครื่องเล่นและคิวเพลงเต็มจอ">
+                    <div id="video-area">
+                        <div id="youtube-player"></div>
+                        <div id="player-placeholder">
+                            <i class="fa-solid fa-music" aria-hidden="true"></i>
+                            <h3>ยังไม่มีเพลงในรายการ</h3>
+                            <p class="muted small">ค้นหาเพลงด้านล่าง หรือใช้มือถือกรอกรหัสห้องเพื่อเพิ่มเพลง</p>
                         </div>
-                        <div>
-                            <h3 class="text-2xl font-bold text-slate-200">ยังไม่มีเพลงในรายการ</h3>
-                            <p class="text-sm text-slate-400 mt-1">สแกน QR Code เพื่อเลือกเพลงจากมือถือของคุณ หรือค้นหาในแถบข้างๆ</p>
+                    </div>
+                    <div id="fullscreen-footer">
+                        <div class="fullscreen-info">
+                            <p id="fullscreen-current" class="truncate">ยังไม่ได้เลือกเพลง</p>
+                            <div id="fullscreen-queue-window" aria-label="คิวเพลงถัดไป">
+                                <div id="fullscreen-queue-track"><span id="fullscreen-queue-text">คิวถัดไป: ไม่มีเพลงในคิว</span><span id="fullscreen-queue-copy" aria-hidden="true" hidden></span></div>
+                            </div>
+                        </div>
+                        <div class="fullscreen-actions">
+                            <button onclick="skipSong()" title="ข้ามเพลง">กดปุ่ม <kbd>2</kbd> ข้ามเพลง</button>
+                            <button onclick="restartSong()" title="เล่นเพลงปัจจุบันใหม่ตั้งแต่ต้น">กดปุ่ม <kbd>0</kbd> เล่นซ้ำ</button>
+                            <button class="fullscreen-extra" onclick="togglePlayPause()" aria-label="เล่นหรือหยุดชั่วคราว"><i class="fa-solid fa-play-pause" aria-hidden="true"></i></button>
+                            <button onclick="toggleFullscreen()" aria-label="ออกจากเต็มจอ">ออก</button>
                         </div>
                     </div>
                 </div>
-
-                <!-- NOW PLAYING BAR -->
-                <div class="glass p-4 rounded-xl flex items-center justify-between gap-4">
-                    <div class="flex items-center gap-3 overflow-hidden">
-                        <div class="w-10 h-10 rounded-lg bg-pink-500/20 text-pink-400 flex-shrink-0 flex items-center justify-center">
-                            <i class="fa-solid fa-compact-disc animate-spin" style="animation-duration: 8s;"></i>
+                <div class="glass controls">
+                    <div class="row between wrap">
+                        <div class="grow controls-title">
+                            <p class="tiny muted">กำลังเล่นขณะนี้</p>
+                            <h3 id="host-now-playing-title" class="truncate small">ยังไม่ได้เลือกเพลง</h3>
                         </div>
-                        <div class="overflow-hidden">
-                            <p class="text-xs text-slate-400 font-medium">กำลังเล่นขณะนี้</p>
-                            <h4 id="host-now-playing-title" class="font-bold text-slate-100 truncate text-sm sm:text-base">ยังไม่ได้เลือกเพลง</h4>
+                        <div class="row control-actions">
+                            <button onclick="togglePlayPause()" class="icon-button" aria-label="เล่นหรือหยุดชั่วคราว"><i id="play-pause-icon" class="fa-solid fa-play" aria-hidden="true"></i></button>
+                            <button onclick="restartSong()" class="small"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> เล่นซ้ำ (0)</button>
+                            <button onclick="skipSong()" class="primary small">ข้ามเพลง (2)</button>
+                            <button onclick="toggleFullscreen()" id="fullscreen-button" class="small"><i class="fa-solid fa-expand" aria-hidden="true"></i> เต็มจอ</button>
                         </div>
                     </div>
+                    <p class="shortcut-help">รีโมททีวี / คีย์บอร์ด: <kbd>2</kbd> ข้ามเพลง · <kbd>0</kbd> เล่นซ้ำตั้งแต่ต้น · <kbd>F</kbd> เต็มจอ · <kbd>Esc</kbd> ออกจากเต็มจอ</p>
+                    <p class="tiny muted">ใช้ปุ่มเต็มจอของแอปเพื่อแสดงคิวเพลง · ปุ่มตัวเลขขึ้นอยู่กับการรองรับของเบราว์เซอร์ทีวี</p>
+                    <div id="player-notice" hidden role="status"></div>
+                </div>
 
-                    <!-- HOST CONTROLS -->
-                    <div class="flex items-center gap-2 flex-shrink-0">
-                        <button onclick="togglePlayPause()" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition">
-                            <i id="play-pause-icon" class="fa-solid fa-pause"></i>
-                        </button>
-                        <button onclick="skipSong()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-medium text-sm shadow-md transition flex items-center gap-2">
-                            <span>ข้ามเพลง</span> <i class="fa-solid fa-forward"></i>
-                        </button>
+                <section class="glass pad" aria-label="ค้นหาเพลงบนทีวี">
+                    <h3 class="section-title"><i class="fa-solid fa-magnifying-glass pink" aria-hidden="true"></i> ค้นหาเพลงบนหน้าจอทีวี</h3>
+                    <form class="search-form" onsubmit="event.preventDefault(); executeSearch('host')">
+                        <input id="host-search-input" type="search" placeholder="ชื่อเพลง / ศิลปิน" autocomplete="off" aria-label="ค้นหาเพลงบนทีวี">
+                        <button class="primary" type="submit">ค้นหา</button>
+                    </form>
+                    <p class="search-hint tiny muted">ค้นหาแล้วกด “ต่อคิว” เพลงแรกจะเริ่มเล่นอัตโนมัติหากยังไม่มีเพลง</p>
+                    <details class="small">
+                        <summary>หรือวางลิงก์ YouTube / Video ID โดยตรง</summary>
+                        <form class="direct-row" onsubmit="event.preventDefault(); addDirectUrl('host')">
+                            <input id="host-direct-url-input" placeholder="YouTube URL หรือ Video ID" aria-label="ลิงก์ YouTube บนทีวี">
+                            <button type="submit">เพิ่มเพลง</button>
+                        </form>
+                    </details>
+                    <div id="host-search-panel" class="results-panel" hidden>
+                        <div class="row between"><h4 class="tiny muted">ผลการค้นหา</h4><button type="button" class="tiny" onclick="closeSearchResults('host')">ปิด</button></div>
+                        <div id="host-search-results" class="search-results" aria-label="ผลค้นหาบนทีวี" aria-busy="false"></div>
                     </div>
+                </section>
+            </div>
+            <aside class="stack">
+                <section class="glass pad">
+                    <p id="host-status" class="status" role="status">กำลังสร้างห้อง…</p>
+                    <h3 id="host-room-code" class="room-code">----</h3>
+                    <p class="small muted">เปิดเว็บเดียวกันบนมือถือ เลือกโหมดรีโมท แล้วกรอกรหัสห้อง 4 หลักนี้</p>
+                    <p id="host-peer-count" class="small" style="margin-top:12px">รีโมทเชื่อมต่อ: 0 เครื่อง</p>
+                </section>
+                <section class="glass pad">
+                    <div class="row between"><h3 class="section-title"><i class="fa-solid fa-list-ol pink" aria-hidden="true"></i> คิวเพลงถัดไป</h3><span id="host-queue-count" class="count">0 เพลง</span></div>
+                    <div id="host-queue-container" class="queue"></div>
+                </section>
+            </aside>
+        </section>
+
+        <section id="screen-remote" class="hidden stack" aria-label="มือถือรีโมท">
+            <div class="glass pad row between wrap">
+                <div>
+                    <p id="remote-status" class="status" role="status">กำลังเชื่อมต่อ…</p>
+                    <p class="small muted">ห้อง <strong id="remote-room-code-display" class="pink">----</strong></p>
+                </div>
+                <div class="row wrap">
+                    <button id="remote-reconnect" class="small" onclick="reconnectRemote()" hidden>เชื่อมต่อใหม่</button>
+                    <button class="small" onclick="sendToHost({type:'RESTART'})">เล่นซ้ำ</button>
+                    <button class="primary small" onclick="remoteSkipSong()">ข้ามเพลง</button>
                 </div>
             </div>
-
-            <!-- RIGHT COLUMN: QUEUE & CONNECT QR -->
-            <div class="lg:col-span-4 flex flex-col space-y-4">
-                
-                <!-- ROOM INFO & QR CODE CARD -->
-                <div class="glass p-4 rounded-2xl border border-slate-700/50 flex items-center gap-4">
-                    <div id="qrcode-container" class="bg-white p-2 rounded-xl shadow-lg flex-shrink-0"></div>
-                    <div class="space-y-1 overflow-hidden">
-                        <div class="flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                            <span class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">ห้องออนไลน์</span>
-                        </div>
-                        <h3 id="host-room-code" class="text-2xl font-black font-mono text-pink-400 tracking-wider">----</h3>
-                        <p class="text-xs text-slate-400">ใช้มือถือสแกน QR Code หรือพิมพ์รหัสห้องนี้เพื่อเข้าควบคุม</p>
-                        <div class="pt-1 flex items-center gap-2 text-xs text-slate-300">
-                            <i class="fa-solid fa-users text-indigo-400"></i>
-                            <span id="host-peer-count">รีโมทเชื่อมต่อ: 0 เครื่อง</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- QUEUE LIST SECTION -->
-                <div class="glass p-4 rounded-2xl flex-1 flex flex-col min-h-[350px]">
-                    <div class="flex items-center justify-between mb-3 border-b border-slate-700/60 pb-2">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-list-ol text-pink-400"></i>
-                            <h3 class="font-bold text-slate-200">รายการเพลงคิวต่อไป</h3>
-                        </div>
-                        <span id="host-queue-count" class="text-xs bg-slate-800 text-pink-400 px-2 py-0.5 rounded-full font-bold">0 เพลง</span>
-                    </div>
-
-                    <div id="host-queue-container" class="flex-1 overflow-y-auto space-y-2 pr-1">
-                        <!-- Queue items injected dynamically -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- REMOTE SCREEN (MOBILE CONTROL MODE) -->
-        <div id="screen-remote" class="hidden flex-1 max-w-2xl w-full mx-auto flex flex-col space-y-4">
-            
-            <!-- REMOTE HEADER STATUS -->
-            <div class="glass p-3 rounded-2xl flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 rounded-full bg-emerald-400"></div>
-                    <div>
-                        <p class="text-xs text-slate-400">เชื่อมต่อกับห้อง</p>
-                        <p id="remote-room-code-display" class="font-mono font-bold text-pink-400 text-sm">----</p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="remoteSkipSong()" class="px-3 py-1.5 bg-pink-500/20 text-pink-300 hover:bg-pink-500/30 border border-pink-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
-                        <i class="fa-solid fa-forward"></i> สั่ง Skip เพลง
-                    </button>
-                </div>
-            </div>
-
-            <!-- SEARCH BAR SECTION -->
-            <div class="glass p-4 rounded-2xl space-y-3">
-                <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">
-                    <i class="fa-solid fa-magnifying-glass text-indigo-400"></i> ค้นหาเพลงคาราโอเกะ (YouTube)
-                </h3>
-                
-                <div class="flex gap-2">
-                    <input type="text" id="remote-search-input" placeholder="พิมพ์ชื่อเพลง / ศิลปิน เช่น 'วัดป่า คาราโอเกะ'"
-                        onkeyup="if(event.key==='Enter') executeSearch()"
-                        class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-pink-500 transition">
-                    <button onclick="executeSearch()" class="bg-gradient-to-r from-pink-500 to-purple-600 px-4 py-2.5 rounded-xl font-medium text-sm text-white hover:opacity-90 transition flex-shrink-0">
-                        ค้นหา
-                    </button>
-                </div>
-
-                <!-- DIRECT LINK / ID INPUT OPTION -->
-                <details class="text-xs text-slate-400">
-                    <summary class="cursor-pointer hover:text-slate-300">หรือวางลิงก์ YouTube โดยตรง</summary>
-                    <div class="flex gap-2 mt-2">
-                        <input type="text" id="direct-url-input" placeholder="วาง YouTube URL หรือ Video ID" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200">
-                        <button onclick="addDirectUrl()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-xs text-white font-medium">เพิ่มเพลง</button>
-                    </div>
+            <section class="glass pad" aria-label="ค้นหาเพลงบนรีโมท">
+                <h3 class="section-title"><i class="fa-solid fa-magnifying-glass pink" aria-hidden="true"></i> ค้นหาเพลงคาราโอเกะ</h3>
+                <form class="search-form" onsubmit="event.preventDefault(); executeSearch('remote')">
+                    <input id="remote-search-input" type="search" placeholder="พิมพ์ชื่อเพลง / ศิลปิน…" autocomplete="off" aria-label="ค้นหาเพลงและแสดงรายการแนะนำ" aria-controls="remote-search-results" aria-describedby="remote-search-hint">
+                    <button type="submit" class="primary">ค้นหา</button>
+                </form>
+                <p id="remote-search-hint" class="search-hint tiny muted">พิมพ์อย่างน้อย 3 ตัวอักษร ระบบจะแนะนำเพลงหลังหยุดพิมพ์ประมาณ 0.9 วินาที กด “ต่อคิว” เพื่อเลือกเพลงได้ทันที</p>
+                <p class="tiny muted">การค้นหาและแนะนำอัตโนมัติต้องตั้งค่า API Key บนอุปกรณ์นี้ และใช้โควตา YouTube Data API</p>
+                <details class="small">
+                    <summary>หรือวางลิงก์ YouTube / Video ID โดยตรง</summary>
+                    <form class="direct-row" onsubmit="event.preventDefault(); addDirectUrl('remote')">
+                        <input id="remote-direct-url-input" placeholder="YouTube URL หรือ Video ID" aria-label="ลิงก์ YouTube บนรีโมท">
+                        <button type="submit">เพิ่มเพลง</button>
+                    </form>
                 </details>
-            </div>
-
-            <!-- SEARCH RESULTS CONTAINER -->
-            <div id="search-results-wrapper" class="hidden glass p-4 rounded-2xl space-y-3 max-h-[300px] overflow-y-auto">
-                <div class="flex justify-between items-center border-b border-slate-700/50 pb-2">
-                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">ผลการค้นหา</h4>
-                    <button onclick="closeSearchResults()" class="text-xs text-slate-400 hover:text-slate-200">ปิด</button>
+                <div id="remote-search-panel" class="results-panel" hidden>
+                    <div class="row between"><h4 id="remote-results-heading" class="tiny muted">เพลงแนะนำ / ผลการค้นหา</h4><button class="tiny" type="button" onclick="closeSearchResults('remote')">ปิด</button></div>
+                    <div id="remote-search-results" class="search-results" aria-label="เพลงแนะนำที่เลือกต่อคิวได้" aria-busy="false"></div>
+                    <p id="remote-search-status" class="tiny muted" role="status" style="margin-top:8px"></p>
                 </div>
-                <div id="search-results-container" class="space-y-2"></div>
-            </div>
-
-            <!-- ACTIVE QUEUE LIST SECTION -->
-            <div class="glass p-4 rounded-2xl flex-1 flex flex-col min-h-[300px]">
-                <div class="flex justify-between items-center border-b border-slate-700/60 pb-2 mb-3">
-                    <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">
-                        <i class="fa-solid fa-list-ol text-pink-400"></i> คิวเพลงปัจจุบัน
-                    </h3>
-                    <span id="remote-queue-count" class="text-xs bg-slate-800 text-pink-400 px-2 py-0.5 rounded-full font-bold">0 เพลง</span>
-                </div>
-
-                <!-- CURRENTLY PLAYING IN REMOTE -->
-                <div id="remote-now-playing-box" class="bg-pink-950/30 border border-pink-500/30 p-3 rounded-xl mb-3 flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm flex-shrink-0">
-                        <i class="fa-solid fa-play"></i>
-                    </div>
-                    <div class="overflow-hidden flex-1">
-                        <p class="text-[10px] text-pink-400 font-semibold uppercase">กำลังเล่นอยู่</p>
-                        <p id="remote-now-playing-title" class="text-xs font-bold text-slate-100 truncate">ยังไม่มีเพลงเล่น</p>
-                    </div>
-                </div>
-
-                <!-- QUEUE LIST ITEMS -->
-                <div id="remote-queue-container" class="space-y-2 flex-1 overflow-y-auto pr-1">
-                    <!-- Dynamic queue items -->
-                </div>
-            </div>
-        </div>
-
+            </section>
+            <section class="glass pad">
+                <div class="row between"><h3 class="section-title"><i class="fa-solid fa-list-ol pink" aria-hidden="true"></i> คิวเพลงปัจจุบัน</h3><span id="remote-queue-count" class="count">0 เพลง</span></div>
+                <div class="now-remote"><p class="tiny pink">กำลังเล่นอยู่</p><p id="remote-now-playing-title" class="small truncate">ยังไม่มีเพลงเล่น</p></div>
+                <div id="remote-queue-container" class="queue"></div>
+            </section>
+        </section>
     </main>
 
-    <!-- MODAL: SET YOUTUBE API KEY -->
-    <div id="modal-apikey" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="glass max-w-md w-full p-6 rounded-2xl space-y-4 border border-slate-700 shadow-2xl">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="font-bold text-lg text-slate-100 flex items-center gap-2">
-                    <i class="fa-solid fa-key text-amber-400"></i> YouTube Data API Key
-                </h3>
-                <button onclick="closeApiKeyModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            
-            <p class="text-xs text-slate-300 leading-relaxed">
-                การตั้งค่า YouTube API Key ช่วยให้คุณสามารถค้นหาเพลงคาราโอเกะได้โดยตรงภายในแอปพลิเคชัน (หากไม่ใส่ สามารถวางลิงก์ YouTube จากแอปอื่นได้):
-            </p>
-
-            <input type="text" id="api-key-input" placeholder="วาง YouTube Data API Key ที่นี่ (AIZAsy...)" 
-                class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-slate-100 focus:outline-none focus:border-pink-500">
-
-            <div class="text-[11px] text-slate-400 bg-slate-900/60 p-3 rounded-xl space-y-1">
-                <p class="font-semibold text-slate-300">วิธีขอ API Key ฟรี:</p>
-                <ol class="list-decimal list-inside space-y-0.5">
-                    <li>ไปที่ Google Cloud Console (console.cloud.google.com)</li>
-                    <li>เปิดใช้งาน "YouTube Data API v3"</li>
-                    <li>สร้าง Credentials -> API Key นำมาคัดลอกใส่ในช่องด้านบน</li>
-                </ol>
-            </div>
-
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="saveApiKey()" class="w-full bg-gradient-to-r from-pink-500 to-purple-600 py-2.5 rounded-xl font-semibold text-sm text-white shadow-lg hover:opacity-90 transition">
-                    บันทึกการตั้งค่า
-                </button>
-            </div>
+    <div id="modal-apikey" class="modal" role="dialog" aria-modal="true" aria-labelledby="apikey-title" hidden>
+        <div class="glass modal-card">
+            <div class="row between"><h3 id="apikey-title">YouTube Data API Key</h3><button class="icon-button" onclick="closeApiKeyModal()" aria-label="ปิดตั้งค่า">✕</button></div>
+            <p style="margin-top:14px">ใช้สำหรับค้นหาเพลงและแนะนำเพลงขณะพิมพ์ หากไม่มี Key ยังสามารถเพิ่มเพลงด้วยลิงก์ได้ โดยตั้งค่าแยกกันในแต่ละอุปกรณ์</p>
+            <input id="api-key-input" type="password" autocomplete="off" placeholder="วาง YouTube Data API Key" aria-label="YouTube Data API Key">
+            <ol>
+                <li>เข้า Google Cloud Console และเลือกหรือสร้างโปรเจกต์</li>
+                <li>เปิดใช้งาน YouTube Data API v3</li>
+                <li>สร้าง Credentials → API key</li>
+                <li>จำกัด Key ให้ใช้เฉพาะ YouTube Data API v3 และ HTTP referrers ของเว็บที่คุณเผยแพร่</li>
+            </ol>
+            <p>Key เก็บในเบราว์เซอร์เครื่องนี้ ไม่ส่งต่อให้รีโมทอื่น แต่ Key ที่ใช้ในเว็บฝั่งผู้ใช้ไม่สามารถซ่อนเป็นความลับได้ ควรจำกัดสิทธิ์และตรวจสอบโควตา</p>
+            <button class="primary" style="width:100%;margin-top:16px" onclick="saveApiKey()">บันทึกการตั้งค่า</button>
         </div>
     </div>
-
-    <!-- MODAL: CONNECT REMOTE INPUT -->
-    <div id="modal-connect" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="glass max-w-sm w-full p-6 rounded-2xl space-y-4 border border-slate-700 shadow-2xl">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="font-bold text-lg text-slate-100 flex items-center gap-2">
-                    <i class="fa-solid fa-mobile-screen-button text-indigo-400"></i> เชื่อมต่อเข้าห้อง TV
-                </h3>
-                <button onclick="closeConnectModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-
-            <p class="text-xs text-slate-300">กรอกรหัสห้อง 4 หลักที่แสดงอยู่บนหน้าจอทีวี (TV Host):</p>
-
-            <input type="text" id="room-code-input" placeholder="เช่น 4829" uppercase max="6"
-                class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-center text-2xl tracking-widest font-mono text-pink-400 font-bold focus:outline-none focus:border-pink-500">
-
-            <button onclick="submitConnectRemote()" class="w-full bg-indigo-600 hover:bg-indigo-500 py-2.5 rounded-xl font-semibold text-sm text-white shadow-lg transition">
-                เชื่อมต่อรีโมท
-            </button>
+    <div id="modal-connect" class="modal" role="dialog" aria-modal="true" aria-labelledby="connect-title" hidden>
+        <div class="glass modal-card">
+            <div class="row between"><h3 id="connect-title">เชื่อมต่อเข้าห้อง TV</h3><button class="icon-button" onclick="closeConnectModal()" aria-label="ปิดเชื่อมต่อ">✕</button></div>
+            <p style="margin-top:14px">กรอกรหัสห้อง 4 หลักที่แสดงบนหน้าจอทีวี</p>
+            <form onsubmit="event.preventDefault(); submitConnectRemote()">
+                <input id="room-code-input" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="4829" aria-label="รหัสห้อง 4 หลัก" required>
+                <button type="submit" class="secondary" style="width:100%">เชื่อมต่อรีโมท</button>
+            </form>
         </div>
     </div>
+    <div id="toast" role="status" hidden></div>
 
-    <!-- SCRIPT APPLICATION CORE -->
     <script>
-        // GLOBAL APP STATE
-        const APP = {
-            mode: null, // 'host' or 'remote'
-            roomId: null,
-            peer: null,
-            connections: [], // Host: store connected remotes
-            hostConn: null,  // Remote: store connection to host
-            queue: [],       // [{ id, title, thumbnail, channel, addedBy }]
-            currentSong: null,
-            youtubePlayer: null,
-            apiKey: localStorage.getItem('mugoke_yt_key') || ''
-        };
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+    function readKey() { try { return localStorage.getItem('mugoke_yt_key') || ''; } catch (_) { return ''; } }
+    const APP = {
+        mode:null, roomId:null, peer:null, connections:[], hostConn:null,
+        queue:[], currentSong:null, youtubePlayer:null, playerReady:false,
+        apiKey:readKey(), revision:0, connectTimer:null, roomAttempts:0,
+        toastTimer:null, shortcutTime:0, lastFocus:null, pendingAdds:new Map()
+    };
+    const SEARCH = {
+        host:{timer:null, controller:null, version:0, composing:false},
+        remote:{timer:null, controller:null, version:0, composing:false}
+    };
+    const searchCache = new Map();
+    const requestId = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-        // INITIALIZATION
-        window.addEventListener('DOMContentLoaded', () => {
-            // Check API Key
-            if(APP.apiKey) {
-                document.getElementById('api-key-input').value = APP.apiKey;
-            }
+    window.addEventListener('DOMContentLoaded', () => {
+        $('api-key-input').value = APP.apiKey;
+        renderQueue('host'); renderQueue('remote'); renderFullscreenQueue();
+        const input = $('remote-search-input');
+        input.addEventListener('input', () => scheduleSuggestions());
+        input.addEventListener('compositionstart', () => { SEARCH.remote.composing = true; cancelSearch('remote'); });
+        input.addEventListener('compositionend', () => { SEARCH.remote.composing = false; scheduleSuggestions(); });
+        $('host-search-input').addEventListener('input', () => cancelSearch('host'));
+        document.addEventListener('keydown', handleKeydown, true);
+        document.addEventListener('fullscreenchange', syncFullscreen);
+        document.addEventListener('webkitfullscreenchange', syncFullscreen);
+        window.addEventListener('resize', updateQueueMarquee);
+        if (window.ResizeObserver) new ResizeObserver(updateQueueMarquee).observe($('fullscreen-queue-window'));
+        setupTVKeys();
+        const params = new URLSearchParams(location.search);
+        if (params.get('mode') === 'remote' && params.get('room')) startRemoteMode(params.get('room'));
+        else if (params.get('mode') === 'host') startHostMode();
+    });
+    window.addEventListener('beforeunload', () => { if (APP.peer) APP.peer.destroy(); });
 
-            // Check URL Parameters for mode
-            const urlParams = new URLSearchParams(window.location.search);
-            const modeParam = urlParams.get('mode');
-            const roomParam = urlParams.get('room');
+    function toast(message) {
+        $('toast').textContent = message; $('toast').hidden = false;
+        clearTimeout(APP.toastTimer); APP.toastTimer = setTimeout(() => $('toast').hidden = true, 3800);
+    }
+    function goHome() {
+        if (!APP.mode || confirm('ต้องการกลับหน้าหลักหรือไม่? หากเป็นเจ้าของห้อง การเชื่อมต่อจะสิ้นสุดลง')) {
+            if (APP.peer) APP.peer.destroy();
+            location.href = location.pathname;
+        }
+    }
+    function showMode(mode) {
+        APP.mode = mode;
+        $('screen-landing').classList.add('hidden');
+        $('screen-host').classList.toggle('hidden', mode !== 'host');
+        $('screen-remote').classList.toggle('hidden', mode !== 'remote');
+    }
+    function setStatus(id, message, state = '') {
+        $(id).textContent = message; $(id).className = 'status ' + state;
+    }
+    function playerNotice(message) {
+        $('player-notice').textContent = message; $('player-notice').hidden = !message;
+        if (message) toast(message);
+    }
 
-            if(modeParam === 'remote' && roomParam) {
-                startRemoteMode(roomParam);
-            } else if(modeParam === 'host') {
-                startHostMode();
+    // YouTube: songs selected before onReady remain pending in currentSong.
+    function loadYouTubeIframeAPI() {
+        if (window.YT && typeof YT.Player === 'function') return onYouTubeIframeAPIReady();
+        if ($('youtube-api-script')) return;
+        const script = document.createElement('script'); script.id = 'youtube-api-script';
+        script.src = 'https://www.youtube.com/iframe_api';
+        script.onerror = () => playerNotice('โหลด YouTube ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วโหลดหน้าใหม่');
+        document.head.appendChild(script);
+    }
+    function onYouTubeIframeAPIReady() {
+        if (APP.mode !== 'host' || APP.youtubePlayer) return;
+        const vars = {autoplay:1, controls:1, rel:0, fs:0, disablekb:1, playsinline:1};
+        if (/^https?:$/.test(location.protocol)) vars.origin = location.origin;
+        APP.youtubePlayer = new YT.Player('youtube-player', {
+            width:'100%', height:'100%', playerVars:vars,
+            events:{
+                onReady:() => {
+                    APP.playerReady = true;
+                    APP.youtubePlayer.getIframe().setAttribute('tabindex','-1');
+                    if (APP.currentSong) APP.youtubePlayer.loadVideoById(APP.currentSong.id);
+                },
+                onStateChange:onPlayerStateChange,
+                onError:event => {
+                    const messages = {
+                        2:'Video ID ไม่ถูกต้อง', 5:'เครื่องเล่น HTML5 ไม่สามารถเล่นวิดีโอนี้ได้',
+                        100:'วิดีโอนี้ถูกลบหรือเป็นวิดีโอส่วนตัว',
+                        101:'เจ้าของวิดีโอไม่อนุญาตให้เล่นบนเว็บไซต์อื่น',
+                        150:'เจ้าของวิดีโอไม่อนุญาตให้เล่นบนเว็บไซต์อื่น',
+                        153:'YouTube ไม่ได้รับข้อมูลอ้างอิงเว็บไซต์ กรุณาเปิดเว็บผ่าน HTTP/HTTPS และอย่าปิด Referrer'
+                    };
+                    playerNotice((messages[event.data] || 'เล่นวิดีโอไม่สำเร็จ') + ' — เลือกข้ามเพลงเพื่อไปเพลงถัดไป');
+                },
+                onAutoplayBlocked:() => playerNotice('เบราว์เซอร์บล็อกการเล่นอัตโนมัติ กรุณากดปุ่มเล่นบนหน้าจอทีวีก่อน')
             }
         });
-
-        function goHome() {
-            if(confirm("ต้องการกลับไปหน้าหลักหรือไม่?")) {
-                window.location.href = window.location.pathname;
-            }
+    }
+    function onPlayerStateChange(event) {
+        if (event.data === YT.PlayerState.ENDED && APP.currentSong) playNextInQueue();
+        if (event.data === YT.PlayerState.PLAYING) {
+            $('play-pause-icon').className = 'fa-solid fa-pause';
+            $('player-notice').hidden = true;
+        } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED || event.data === YT.PlayerState.CUED) {
+            $('play-pause-icon').className = 'fa-solid fa-play';
         }
-
-        // ==========================================
-        // YOUTUBE PLAYER INTEGRATION
-        // ==========================================
-        function loadYouTubeIframeAPI() {
-            if (window.YT) return;
-            const tag = document.createElement('script');
-            tag.src = "https://www.youtube.com/iframe_api";
-            const firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    }
+    function togglePlayPause() {
+        if (!APP.playerReady || !APP.currentSong) return;
+        if (APP.youtubePlayer.getPlayerState() === YT.PlayerState.PLAYING) APP.youtubePlayer.pauseVideo();
+        else APP.youtubePlayer.playVideo();
+    }
+    function restartSong() {
+        if (APP.mode !== 'host' || !APP.currentSong) return;
+        if (APP.playerReady) { APP.youtubePlayer.seekTo(0, true); APP.youtubePlayer.playVideo(); }
+        toast('เล่นซ้ำตั้งแต่ต้น: ' + APP.currentSong.title);
+    }
+    function playNextInQueue() {
+        if (APP.mode !== 'host') return;
+        APP.currentSong = APP.queue.shift() || null;
+        $('player-placeholder').classList.toggle('hidden', !!APP.currentSong);
+        $('host-now-playing-title').textContent = APP.currentSong ? APP.currentSong.title : 'ยังไม่ได้เลือกเพลง';
+        $('player-notice').hidden = true;
+        if (APP.playerReady) {
+            if (APP.currentSong) APP.youtubePlayer.loadVideoById(APP.currentSong.id);
+            else { APP.youtubePlayer.stopVideo(); $('play-pause-icon').className = 'fa-solid fa-play'; }
         }
+        commitState();
+    }
+    function skipSong() { if (APP.mode === 'host') playNextInQueue(); }
 
-        function onYouTubeIframeAPIReady() {
-            APP.youtubePlayer = new YT.Player('youtube-player', {
-                height: '100%',
-                width: '100%',
-                playerVars: {
-                    'autoplay': 1,
-                    'controls': 1,
-                    'rel': 0,
-                    'modestbranding': 1
-                },
-                events: {
-                    'onStateChange': onPlayerStateChange
-                }
-            });
-        }
-
-        function onPlayerStateChange(event) {
-            // Video ended -> Auto play next song
-            if (event.data === YT.PlayerState.ENDED) {
-                skipSong();
-            }
-            if (event.data === YT.PlayerState.PLAYING) {
-                document.getElementById('play-pause-icon').className = "fa-solid fa-pause";
-            }
-            if (event.data === YT.PlayerState.PAUSED) {
-                document.getElementById('play-pause-icon').className = "fa-solid fa-play";
-            }
-        }
-
-        function togglePlayPause() {
-            if (!APP.youtubePlayer) return;
-            const state = APP.youtubePlayer.getPlayerState();
-            if (state === YT.PlayerState.PLAYING) {
-                APP.youtubePlayer.pauseVideo();
-            } else {
-                APP.youtubePlayer.playVideo();
-            }
-        }
-
-        // ==========================================
-        // HOST MODE (TV HOST)
-        // ==========================================
-        function startHostMode() {
-            APP.mode = 'host';
-            document.getElementById('screen-landing').classList.add('hidden');
-            document.getElementById('screen-host').classList.remove('hidden');
-
-            loadYouTubeIframeAPI();
-
-            // Generate Room Code (4 digits)
-            const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
-            APP.roomId = 'MUGOKE-' + randomCode;
-
-            document.getElementById('host-room-code').innerText = randomCode;
-
-            // Generate QR Code
-            const remoteUrl = `${window.location.origin}${window.location.pathname}?mode=remote&room=${randomCode}`;
-            document.getElementById('qrcode-container').innerHTML = '';
-            new QRCode(document.getElementById('qrcode-container'), {
-                text: remoteUrl,
-                width: 96,
-                height: 96,
-                colorDark: "#0f172a",
-                colorLight: "#ffffff"
-            });
-
-            // Initialize PeerJS Host
-            APP.peer = new Peer(APP.roomId);
-
-            APP.peer.on('open', (id) => {
-                console.log('Host Room Ready:', id);
-            });
-
-            APP.peer.on('connection', (conn) => {
-                APP.connections.push(conn);
-                updatePeerCount();
-
-                conn.on('data', (data) => {
-                    handleRemoteMessage(data);
-                });
-
-                conn.on('close', () => {
-                    APP.connections = APP.connections.filter(c => c !== conn);
-                    updatePeerCount();
-                });
-
-                // Sync state immediately to new connected remote
-                broadcastState();
-            });
-        }
-
-        function updatePeerCount() {
-            document.getElementById('host-peer-count').innerText = `รีโมทเชื่อมต่อ: ${APP.connections.length} เครื่อง`;
-        }
-
-        function handleRemoteMessage(data) {
-            if (data.type === 'ADD_SONG') {
-                APP.queue.push(data.song);
-                if (!APP.currentSong) {
-                    playNextInQueue();
-                } else {
-                    renderHostQueue();
-                    broadcastState();
-                }
-            } else if (data.type === 'SKIP') {
-                skipSong();
-            } else if (data.type === 'REMOVE_SONG') {
-                APP.queue.splice(data.index, 1);
-                renderHostQueue();
-                broadcastState();
-            } else if (data.type === 'MOVE_SONG') {
-                const { fromIndex, toIndex } = data;
-                if (fromIndex >= 0 && toIndex >= 0 && fromIndex < APP.queue.length && toIndex < APP.queue.length) {
-                    const item = APP.queue.splice(fromIndex, 1)[0];
-                    APP.queue.splice(toIndex, 0, item);
-                    renderHostQueue();
-                    broadcastState();
-                }
-            }
-        }
-
-        function playNextInQueue() {
-            if (APP.queue.length > 0) {
-                APP.currentSong = APP.queue.shift();
-                document.getElementById('player-placeholder').classList.add('hidden');
-                document.getElementById('host-now-playing-title').innerText = APP.currentSong.title;
-
-                if (APP.youtubePlayer && APP.youtubePlayer.loadVideoById) {
-                    APP.youtubePlayer.loadVideoById(APP.currentSong.id);
-                }
-            } else {
-                APP.currentSong = null;
-                document.getElementById('player-placeholder').classList.remove('hidden');
-                document.getElementById('host-now-playing-title').innerText = "ยังไม่ได้เลือกเพลง";
-                if (APP.youtubePlayer && APP.youtubePlayer.stopVideo) {
-                    APP.youtubePlayer.stopVideo();
-                }
-            }
-            renderHostQueue();
-            broadcastState();
-        }
-
-        function skipSong() {
-            playNextInQueue();
-        }
-
-        function renderHostQueue() {
-            const container = document.getElementById('host-queue-container');
-            document.getElementById('host-queue-count').innerText = `${APP.queue.length} เพลง`;
-            container.innerHTML = '';
-
-            if (APP.queue.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-10 text-slate-500 text-xs">
-                        ไม่มีคิวเพลงถัดไป
-                    </div>`;
+    // Fullscreen layout deliberately reserves 90% for video and 10% for queue + controls.
+    function nativeFullscreenElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
+    async function toggleFullscreen() {
+        if (APP.mode !== 'host') return;
+        const stage = $('tv-stage');
+        try {
+            if (nativeFullscreenElement()) {
+                const exit = document.exitFullscreen || document.webkitExitFullscreen;
+                if (exit) await exit.call(document);
                 return;
             }
-
-            APP.queue.forEach((song, idx) => {
-                const card = document.createElement('div');
-                card.className = 'glass-card p-2 rounded-xl flex items-center justify-between gap-3 border border-slate-700/40 hover:border-slate-600 transition';
-                card.innerHTML = `
-                    <div class="flex items-center gap-2.5 overflow-hidden">
-                        <span class="w-6 text-center text-xs font-mono font-bold text-pink-400">${idx + 1}</span>
-                        <img src="${song.thumbnail || 'https://via.placeholder.com/120x90'}" class="w-12 h-9 object-cover rounded-md flex-shrink-0">
-                        <div class="overflow-hidden">
-                            <p class="text-xs font-medium text-slate-200 truncate">${song.title}</p>
-                            <p class="text-[10px] text-slate-400 truncate">${song.channel || 'YouTube'}</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-1">
-                        <button onclick="moveQueue(${idx}, ${idx - 1})" ${idx === 0 ? 'disabled class="opacity-20 text-slate-500 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>
-                            <i class="fa-solid fa-chevron-up text-xs"></i>
-                        </button>
-                        <button onclick="moveQueue(${idx}, ${idx + 1})" ${idx === APP.queue.length - 1 ? 'disabled class="opacity-20 text-slate-500 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>
-                            <i class="fa-solid fa-chevron-down text-xs"></i>
-                        </button>
-                        <button onclick="removeQueue(${idx})" class="text-red-400 hover:text-red-300 p-1 ml-1">
-                            <i class="fa-solid fa-trash-can text-xs"></i>
-                        </button>
-                    </div>
-                `;
-                container.appendChild(card);
+            if (stage.classList.contains('theater')) { leaveTheater(); return; }
+            stage.classList.add('cinema');
+            const request = stage.requestFullscreen || stage.webkitRequestFullscreen;
+            if (request) {
+                try { await request.call(stage); }
+                catch (_) { enterTheater(); toast('เบราว์เซอร์ไม่อนุญาตเต็มจอ จึงใช้โหมดขยายเต็มพื้นที่เว็บแทน'); }
+            } else { enterTheater(); toast('ใช้โหมดขยายเต็มพื้นที่เว็บ เนื่องจากเบราว์เซอร์ไม่รองรับ Fullscreen API'); }
+            stage.focus({preventScroll:true});
+            $('fullscreen-button').innerHTML = '<i class="fa-solid fa-compress" aria-hidden="true"></i> ออกจากเต็มจอ';
+            requestAnimationFrame(updateQueueMarquee);
+        } catch (_) { enterTheater(); }
+    }
+    function enterTheater() {
+        $('tv-stage').classList.add('cinema','theater'); document.body.classList.add('theater-open');
+        $('tv-stage').focus(); requestAnimationFrame(updateQueueMarquee);
+    }
+    function leaveTheater() {
+        $('tv-stage').classList.remove('cinema','theater'); document.body.classList.remove('theater-open');
+        $('fullscreen-button').innerHTML = '<i class="fa-solid fa-expand" aria-hidden="true"></i> เต็มจอ';
+        $('fullscreen-button').focus();
+    }
+    function syncFullscreen() {
+        const active = nativeFullscreenElement() === $('tv-stage');
+        $('tv-stage').classList.toggle('cinema', active || $('tv-stage').classList.contains('theater'));
+        if (active) $('tv-stage').focus();
+        if (!active && !$('tv-stage').classList.contains('theater')) {
+            $('fullscreen-button').innerHTML = '<i class="fa-solid fa-expand" aria-hidden="true"></i> เต็มจอ';
+            if (APP.mode === 'host') $('fullscreen-button').focus();
+        }
+        requestAnimationFrame(updateQueueMarquee);
+    }
+    function renderFullscreenQueue() {
+        $('fullscreen-current').textContent = APP.currentSong ? 'กำลังเล่น: ' + APP.currentSong.title : 'ยังไม่ได้เลือกเพลง';
+        const text = APP.queue.length ? 'คิวถัดไป (' + APP.queue.length + '):  ' + APP.queue.map((song,i) => (i+1) + '. ' + song.title).join('   •   ') : 'คิวถัดไป: ไม่มีเพลงในคิว';
+        $('fullscreen-queue-text').textContent = text; $('fullscreen-queue-copy').textContent = text;
+        requestAnimationFrame(updateQueueMarquee);
+    }
+    function updateQueueMarquee() {
+        const track = $('fullscreen-queue-track'), copy = $('fullscreen-queue-copy');
+        if (!$('tv-stage').classList.contains('cinema')) return;
+        track.classList.remove('running'); copy.hidden = true;
+        if ($('fullscreen-queue-text').getBoundingClientRect().width > $('fullscreen-queue-window').clientWidth) {
+            copy.hidden = false;
+            track.style.setProperty('--scroll-duration', Math.max(18, track.scrollWidth / 2 / 55) + 's');
+            track.classList.add('running');
+        }
+    }
+    function setupTVKeys() {
+        // Optional Samsung Tizen support; other browsers use regular keydown events.
+        try {
+            if (window.tizen && tizen.tvinputdevice) ['0','2'].forEach(key => {
+                try { tizen.tvinputdevice.registerKey(key); } catch (_) {}
             });
+        } catch (_) {}
+    }
+    function handleKeydown(event) {
+        if (event.key === 'Tab' && trapModalTab(event)) return;
+        if (event.key === 'Escape' || event.keyCode === 10009) {
+            if (!$('modal-apikey').hidden) { event.preventDefault(); closeApiKeyModal(); return; }
+            if (!$('modal-connect').hidden) { event.preventDefault(); closeConnectModal(); return; }
+            if ($('tv-stage').classList.contains('theater')) { event.preventDefault(); leaveTheater(); return; }
         }
+        if (APP.mode !== 'host' || !$('modal-apikey').hidden || !$('modal-connect').hidden) return;
+        const target = event.target;
+        if (event.isComposing || event.ctrlKey || event.altKey || event.metaKey ||
+            (target instanceof Element && target.closest('input,textarea,select,[contenteditable="true"],[role="textbox"]'))) return;
+        const key = event.key, code = event.code, number = event.keyCode || event.which;
+        const skip = key === '2' || code === 'Digit2' || code === 'Numpad2' || number === 50 || number === 98;
+        const restart = key === '0' || code === 'Digit0' || code === 'Numpad0' || number === 48 || number === 96;
+        const full = key === 'f' || key === 'F';
+        if (!skip && !restart && !full) return;
+        event.preventDefault(); event.stopPropagation();
+        if (event.repeat || Date.now() - APP.shortcutTime < 450) return;
+        APP.shortcutTime = Date.now();
+        if (skip) skipSong(); else if (restart) restartSong(); else toggleFullscreen();
+    }
 
-        function moveQueue(from, to) {
-            if (to < 0 || to >= APP.queue.length) return;
-            const song = APP.queue.splice(from, 1)[0];
-            APP.queue.splice(to, 0, song);
-            renderHostQueue();
-            broadcastState();
+    // PeerJS: host is authoritative. Initial state is sent after the data channel opens.
+    function startHostMode() {
+        if (APP.mode) return;
+        showMode('host'); loadYouTubeIframeAPI(); createHostRoom();
+    }
+    function createHostRoom() {
+        if (!window.Peer) { setStatus('host-status','โหลดบริการเชื่อมต่อไม่สำเร็จ แต่ยังค้นหาและเล่นเพลงบนทีวีได้','offline'); return; }
+        APP.roomAttempts++;
+        const code = String(Math.floor(1000 + Math.random() * 9000));
+        APP.roomId = 'MUGOKE-' + code; $('host-room-code').textContent = code;
+        const peer = new Peer(APP.roomId); APP.peer = peer;
+        peer.on('open', () => { APP.roomAttempts = 0; setStatus('host-status','ห้องออนไลน์','online'); });
+        peer.on('connection', conn => {
+            conn.on('open', () => {
+                if (!APP.connections.includes(conn)) APP.connections.push(conn);
+                updatePeerCount(); sendState(conn);
+            });
+            conn.on('data', data => { if (conn.open) handleRemoteMessage(data,conn); });
+            const remove = () => { APP.connections = APP.connections.filter(item => item !== conn); updatePeerCount(); };
+            conn.on('close',remove); conn.on('error',remove);
+        });
+        peer.on('disconnected', () => {
+            setStatus('host-status','ขาดการเชื่อมต่อบริการห้อง กำลังเชื่อมต่อใหม่…');
+            if (!peer.destroyed) { try { peer.reconnect(); } catch (_) {} }
+        });
+        peer.on('error', error => {
+            if (error.type === 'unavailable-id' && APP.roomAttempts < 8) {
+                peer.destroy(); setStatus('host-status','รหัสห้องซ้ำ กำลังสร้างรหัสใหม่…'); createHostRoom(); return;
+            }
+            setStatus('host-status','เชื่อมต่อห้องไม่สำเร็จ แต่ยังเล่นเพลงบนทีวีได้','offline');
+            toast('ปัญหาการเชื่อมต่อ: ' + error.type);
+        });
+    }
+    function updatePeerCount() {
+        $('host-peer-count').textContent = 'รีโมทเชื่อมต่อ: ' + APP.connections.filter(conn => conn.open).length + ' เครื่อง';
+    }
+    function stateData() { return {type:'STATE_UPDATE',currentSong:APP.currentSong,queue:APP.queue,revision:APP.revision}; }
+    function safeSend(conn,data) {
+        if (!conn || !conn.open) return false;
+        try { conn.send(data); return true; } catch (_) { return false; }
+    }
+    function sendState(conn) { safeSend(conn,stateData()); }
+    function broadcastState() { APP.connections.forEach(sendState); }
+    function commitState() { APP.revision++; renderQueue('host'); renderFullscreenQueue(); broadcastState(); }
+    function normalizeSong(song) {
+        if (!song || typeof song.id !== 'string' || !VIDEO_ID.test(song.id)) return null;
+        return {
+            id:song.id, title:String(song.title || 'YouTube Video (' + song.id + ')').slice(0,300),
+            channel:String(song.channel || 'YouTube').slice(0,150),
+            thumbnail:'https://img.youtube.com/vi/' + song.id + '/mqdefault.jpg'
+        };
+    }
+    function enqueueSong(rawSong) {
+        const song = normalizeSong(rawSong);
+        if (!song || APP.queue.length >= 300) return false;
+        APP.queue.push({...song,queueId:requestId()});
+        if (!APP.currentSong) playNextInQueue(); else commitState();
+        return true;
+    }
+    function handleRemoteMessage(data,conn) {
+        if (!data || typeof data !== 'object') return;
+        if (data.type === 'GET_STATE') return sendState(conn);
+        if (data.type === 'ADD_SONG') {
+            const accepted = enqueueSong(data.song);
+            safeSend(conn,{type:'ADD_RESULT',requestId:data.requestId,accepted});
+        } else if (data.type === 'SKIP' || data.type === 'RESTART') {
+            // Reject a stale command if another remote already changed the current song.
+            if (data.currentQueueId !== (APP.currentSong && APP.currentSong.queueId)) return sendState(conn);
+            if (data.type === 'SKIP') skipSong(); else restartSong();
+        } else if (data.type === 'REMOVE_SONG') {
+            const index = APP.queue.findIndex(song => song.queueId === data.queueId);
+            if (index !== -1) { APP.queue.splice(index,1); commitState(); }
+        } else if (data.type === 'MOVE_SONG') {
+            // Relative moves use stable IDs rather than potentially stale queue indexes.
+            const from = APP.queue.findIndex(song => song.queueId === data.queueId);
+            const direction = data.direction;
+            if (from !== -1 && (direction === -1 || direction === 1)) moveQueue(from,from+direction);
         }
-
-        function removeQueue(idx) {
-            APP.queue.splice(idx, 1);
-            renderHostQueue();
-            broadcastState();
+    }
+    function moveQueue(from,to) {
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 || from >= APP.queue.length || to >= APP.queue.length) return;
+        APP.queue.splice(to,0,APP.queue.splice(from,1)[0]); commitState();
+    }
+    function removeQueue(index) {
+        if (!Number.isInteger(index) || index < 0 || index >= APP.queue.length) return;
+        APP.queue.splice(index,1); commitState();
+    }
+    function addSong(song) {
+        if (APP.mode === 'host') {
+            if (enqueueSong(song)) toast('เพิ่มเพลงเข้าคิวแล้ว: ' + song.title);
+            else toast('เพิ่มเพลงไม่สำเร็จ: ลิงก์ไม่ถูกต้องหรือคิวเต็ม');
+            return;
         }
+        const id = requestId();
+        if (sendToHost({type:'ADD_SONG',song,requestId:id})) {
+            const timer = setTimeout(() => {
+                APP.pendingAdds.delete(id); toast('ยังไม่ได้รับการยืนยัน กรุณาตรวจสอบคิวก่อนเพิ่มเพลงซ้ำ');
+            },10000);
+            APP.pendingAdds.set(id,{title:song.title,timer});
+        }
+    }
 
-        function broadcastState() {
-            const stateData = {
-                type: 'STATE_UPDATE',
-                currentSong: APP.currentSong,
-                queue: APP.queue
+    // Render untrusted titles using textContent and bind callbacks, never inline JSON/HTML.
+    function element(tag,className,text) {
+        const node = document.createElement(tag); if (className) node.className = className;
+        if (text !== undefined) node.textContent = text; return node;
+    }
+    function makeButton(label,title,callback,className = '') {
+        const button = element('button',className,label); button.type = 'button'; button.title = title;
+        button.setAttribute('aria-label',title); button.addEventListener('click',callback); return button;
+    }
+    function songImage(song) {
+        const img = document.createElement('img'); img.src = 'https://img.youtube.com/vi/' + song.id + '/mqdefault.jpg';
+        img.alt = ''; img.loading = 'lazy'; img.addEventListener('error',() => { img.style.visibility = 'hidden'; },{once:true});
+        return img;
+    }
+    function renderQueue(mode) {
+        const container = $(mode + '-queue-container'); container.replaceChildren();
+        $(mode + '-queue-count').textContent = APP.queue.length + ' เพลง';
+        if (mode === 'remote') $('remote-now-playing-title').textContent = APP.currentSong ? APP.currentSong.title : 'ยังไม่มีเพลงเล่น';
+        if (!APP.queue.length) { container.append(element('p','empty','ไม่มีคิวเพลงถัดไป')); return; }
+        APP.queue.forEach((song,index) => {
+            const card = element('div','song-card'); card.append(element('span','queue-index',index+1),songImage(song));
+            const info = element('div','grow'); const title = element('p','song-title truncate',song.title); title.title = song.title;
+            info.append(title,element('p','song-subtitle truncate',song.channel || 'YouTube')); card.append(info);
+            const actions = element('div','queue-actions');
+            const move = direction => {
+                if (mode === 'host') { const from = APP.queue.findIndex(item => item.queueId === song.queueId); moveQueue(from,from+direction); }
+                else sendToHost({type:'MOVE_SONG',queueId:song.queueId,direction});
             };
+            const up = makeButton('▲','เลื่อนเพลงขึ้น',() => move(-1)); up.disabled = index === 0;
+            const down = makeButton('▼','เลื่อนเพลงลง',() => move(1)); down.disabled = index === APP.queue.length-1;
+            const remove = makeButton('✕','ลบเพลง ' + song.title,() => {
+                if (mode === 'host') removeQueue(APP.queue.findIndex(item => item.queueId === song.queueId));
+                else sendToHost({type:'REMOVE_SONG',queueId:song.queueId});
+            },'danger');
+            actions.append(up,down,remove); card.append(actions); container.append(card);
+        });
+    }
 
-            APP.connections.forEach(conn => {
-                if (conn.open) {
-                    conn.send(stateData);
+    function submitConnectRemote() {
+        const code = $('room-code-input').value.trim();
+        if (!/^\d{4}$/.test(code)) return toast('กรุณากรอกรหัสห้องเป็นตัวเลข 4 หลัก');
+        closeConnectModal(); startRemoteMode(code);
+    }
+    function startRemoteMode(roomCode) {
+        if (!/^\d{4}$/.test(String(roomCode))) { toast('รหัสห้องไม่ถูกต้อง'); showConnectRemoteModal(); return; }
+        showMode('remote'); APP.roomId = 'MUGOKE-' + roomCode;
+        $('remote-room-code-display').textContent = roomCode;
+        if (!window.Peer) { markRemoteOffline('โหลดบริการเชื่อมต่อไม่สำเร็จ กรุณาโหลดหน้าใหม่'); return; }
+        if (APP.peer) APP.peer.destroy();
+        const peer = new Peer(); APP.peer = peer;
+        setStatus('remote-status','กำลังเชื่อมต่อ…'); $('remote-reconnect').hidden = true;
+        peer.on('open',connectToHost);
+        peer.on('error',error => markRemoteOffline(error.type === 'peer-unavailable' ? 'ไม่พบห้อง กรุณาตรวจสอบรหัสและเปิดหน้าจอทีวีไว้' : 'เชื่อมต่อไม่สำเร็จ: ' + error.type));
+        peer.on('disconnected',() => {
+            // An existing data channel can remain usable even if signaling disconnects.
+            if (!APP.hostConn || !APP.hostConn.open) markRemoteOffline('บริการเชื่อมต่อขาดการติดต่อ');
+        });
+    }
+    function markRemoteOffline(message) {
+        clearTimeout(APP.connectTimer); setStatus('remote-status',message,'offline'); $('remote-reconnect').hidden = false;
+    }
+    function reconnectRemote() {
+        if (!APP.roomId) return;
+        if (APP.hostConn) APP.hostConn.close();
+        startRemoteMode(APP.roomId.replace('MUGOKE-',''));
+    }
+    function connectToHost() {
+        clearTimeout(APP.connectTimer);
+        const conn = APP.peer.connect(APP.roomId,{reliable:true}); APP.hostConn = conn;
+        APP.connectTimer = setTimeout(() => { if (APP.hostConn === conn && !conn.open) { conn.close(); markRemoteOffline('เชื่อมต่อนานเกินไป กรุณาตรวจสอบเครือข่ายหรือรหัสห้อง'); } },15000);
+        conn.on('open',() => {
+            if (APP.hostConn !== conn) return;
+            clearTimeout(APP.connectTimer); setStatus('remote-status','เชื่อมต่อแล้ว','online'); $('remote-reconnect').hidden = true;
+            safeSend(conn,{type:'GET_STATE'});
+        });
+        conn.on('data',data => {
+            if (APP.hostConn !== conn || !data || typeof data !== 'object') return;
+            if (data.type === 'STATE_UPDATE' && Array.isArray(data.queue)) {
+                APP.currentSong = data.currentSong; APP.queue = data.queue; APP.revision = data.revision || 0;
+                renderQueue('remote');
+            } else if (data.type === 'ADD_RESULT') {
+                const pending = APP.pendingAdds.get(data.requestId);
+                if (pending) {
+                    clearTimeout(pending.timer); APP.pendingAdds.delete(data.requestId);
+                    toast(data.accepted ? 'เพิ่มเพลงเข้าคิวแล้ว: ' + pending.title : 'เพิ่มเพลงไม่สำเร็จ: ลิงก์ไม่ถูกต้องหรือคิวเต็ม');
                 }
-            });
+            }
+        });
+        conn.on('close',() => { if (APP.hostConn === conn) markRemoteOffline('การเชื่อมต่อกับทีวีหลุด'); });
+        conn.on('error',() => { if (APP.hostConn === conn) markRemoteOffline('เกิดปัญหาการเชื่อมต่อกับทีวี'); });
+    }
+    function sendToHost(action) {
+        if (action.type === 'SKIP' || action.type === 'RESTART') action = {...action,currentQueueId:APP.currentSong && APP.currentSong.queueId};
+        if (safeSend(APP.hostConn,action)) return true;
+        toast('ยังไม่ได้เชื่อมต่อหน้าจอทีวี'); return false;
+    }
+    function remoteSkipSong() { sendToHost({type:'SKIP'}); }
+
+    // Live suggestions are actual selectable YouTube search matches, not an unofficial autocomplete endpoint.
+    // Debounce, in-memory cache, abort and version checks prevent stale results and reduce API requests.
+    function cancelSearch(mode) {
+        const state = SEARCH[mode]; clearTimeout(state.timer); state.version++;
+        if (state.controller) state.controller.abort();
+        state.controller = null; $(mode + '-search-results').setAttribute('aria-busy','false');
+    }
+    function scheduleSuggestions() {
+        cancelSearch('remote');
+        const query = $('remote-search-input').value.trim();
+        $('remote-search-results').replaceChildren();
+        if (!query) { $('remote-search-panel').hidden = true; return; }
+        $('remote-search-panel').hidden = false;
+        if (SEARCH.remote.composing) return;
+        if (Array.from(query).length < 3) {
+            showSearchMessage('remote','พิมพ์อย่างน้อย 3 ตัวอักษรเพื่อดูเพลงแนะนำ หรือกดค้นหาได้ทันที'); return;
         }
-
-        // ==========================================
-        // REMOTE MODE (MOBILE CONTROL)
-        // ==========================================
-        function showConnectRemoteModal() {
-            document.getElementById('modal-connect').classList.remove('hidden');
+        if (!APP.apiKey) { showMissingKey('remote'); return; }
+        showSearchMessage('remote','กำลังรอให้หยุดพิมพ์เพื่อแนะนำเพลง…');
+        SEARCH.remote.timer = setTimeout(() => executeSearch('remote',true),900);
+    }
+    function decodeEntities(text) {
+        const area = document.createElement('textarea'); area.innerHTML = String(text); return area.value;
+    }
+    function showSearchMessage(mode,message,error = false) {
+        const container = $(mode + '-search-results');
+        const p = element('p','empty' + (error ? ' danger' : ''),message); container.replaceChildren(p);
+        if (mode === 'remote') $('remote-search-status').textContent = message;
+    }
+    function showMissingKey(mode) {
+        showSearchMessage(mode,'ตั้งค่า YouTube API Key บนอุปกรณ์นี้เพื่อค้นหาและแนะนำเพลง หรือเพิ่มเพลงด้วยลิงก์โดยตรง');
+        $(mode + '-search-results').append(makeButton('ตั้งค่า API Key','ตั้งค่า YouTube API Key',openApiKeyModal,'small'));
+    }
+    async function executeSearch(mode = APP.mode,automatic = false) {
+        if (mode !== 'host' && mode !== 'remote') return;
+        const state = SEARCH[mode]; if (state.composing) return;
+        cancelSearch(mode);
+        const query = $(mode + '-search-input').value.trim(); if (!query) return;
+        $(mode + '-search-panel').hidden = false;
+        if (!APP.apiKey) { showMissingKey(mode); return; }
+        if (mode === 'remote') $('remote-results-heading').textContent = automatic ? 'เพลงที่ใกล้เคียง — กดต่อคิวเพื่อเลือก' : 'ผลการค้นหา — กดต่อคิวเพื่อเลือก';
+        const normalizedQuery = /คาราโอเกะ|karaoke/i.test(query) ? query : query + ' คาราโอเกะ';
+        const cacheKey = normalizedQuery.toLocaleLowerCase();
+        const cached = searchCache.get(cacheKey);
+        if (cached && Date.now()-cached.time < 5*60*1000) { renderSearchResults(mode,cached.songs); return; }
+        const version = state.version;
+        const controller = new AbortController(); state.controller = controller;
+        let timedOut = false;
+        const timeout = setTimeout(() => { timedOut = true; controller.abort(); },15000);
+        showSearchMessage(mode,'กำลังค้นหาเพลง…'); $(mode + '-search-results').setAttribute('aria-busy','true');
+        try {
+            const params = new URLSearchParams({part:'snippet',type:'video',maxResults:'10',q:normalizedQuery,videoEmbeddable:'true',relevanceLanguage:'th',key:APP.apiKey});
+            const response = await fetch('https://www.googleapis.com/youtube/v3/search?' + params,{signal:controller.signal});
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                const reason = data.error && data.error.errors && data.error.errors[0] && data.error.errors[0].reason;
+                if (reason === 'quotaExceeded' || reason === 'dailyLimitExceeded') throw new Error('โควตา YouTube API หมดชั่วคราว กรุณาเพิ่มเพลงด้วยลิงก์แทน');
+                throw new Error(data.error && data.error.message || 'YouTube API ตอบกลับไม่สำเร็จ');
+            }
+            const songs = (data.items || []).filter(item => item.id && VIDEO_ID.test(item.id.videoId) && item.snippet).map(item => ({
+                id:item.id.videoId, title:decodeEntities(item.snippet.title), channel:decodeEntities(item.snippet.channelTitle)
+            }));
+            if (version !== state.version) return;
+            if (searchCache.size >= 60) searchCache.delete(searchCache.keys().next().value);
+            searchCache.set(cacheKey,{time:Date.now(),songs}); renderSearchResults(mode,songs);
+        } catch (error) {
+            if (version !== state.version) return;
+            if (error.name !== 'AbortError' || timedOut) showSearchMessage(mode,timedOut ? 'ค้นหานานเกินไป กรุณาลองใหม่' : 'ค้นหาไม่สำเร็จ: ' + error.message,true);
+        } finally {
+            clearTimeout(timeout);
+            if (version === state.version) { state.controller = null; $(mode + '-search-results').setAttribute('aria-busy','false'); }
         }
-
-        function closeConnectModal() {
-            document.getElementById('modal-connect').classList.add('hidden');
-        }
-
-        function submitConnectRemote() {
-            const code = document.getElementById('room-code-input').value.trim();
-            if(!code) return alert('กรุณากรอกรหัสห้อง');
-            closeConnectModal();
-            startRemoteMode(code);
-        }
-
-        function startRemoteMode(roomCode) {
-            APP.mode = 'remote';
-            APP.roomId = 'MUGOKE-' + roomCode;
-
-            document.getElementById('screen-landing').classList.add('hidden');
-            document.getElementById('screen-remote').classList.remove('hidden');
-            document.getElementById('remote-room-code-display').innerText = roomCode;
-
-            // Initialize PeerJS Client
-            APP.peer = new Peer();
-
-            APP.peer.on('open', () => {
-                console.log('Remote Peer Ready. Connecting to host:', APP.roomId);
-                connectToHost();
-            });
-
-            APP.peer.on('error', (err) => {
-                console.error('Peer error:', err);
-                alert('ไม่สามารถเชื่อมต่อกับห้องได้ กรุณาตรวจสอบรหัสห้องอีกครั้ง');
-            });
-        }
-
-        function connectToHost() {
-            APP.hostConn = APP.peer.connect(APP.roomId);
-
-            APP.hostConn.on('open', () => {
-                console.log('Connected to Host!');
-            });
-
-            APP.hostConn.on('data', (data) => {
-                if (data.type === 'STATE_UPDATE') {
-                    APP.currentSong = data.currentSong;
-                    APP.queue = data.queue;
-                    renderRemoteQueue();
+    }
+    function renderSearchResults(mode,songs) {
+        const container = $(mode + '-search-results'); container.replaceChildren();
+        if (!songs.length) { showSearchMessage(mode,'ไม่พบเพลงที่ใกล้เคียง ลองเปลี่ยนคำค้นหา'); return; }
+        if (mode === 'remote') $('remote-search-status').textContent = 'พบ ' + songs.length + ' เพลง เลือกเพลงแล้วกดต่อคิวได้เลย';
+        songs.forEach(song => {
+            const card = element('div','song-card'); card.append(songImage(song));
+            const info = element('div','grow'); const title = element('p','song-title truncate',song.title); title.title = song.title;
+            info.append(title,element('p','song-subtitle truncate',song.channel)); card.append(info);
+            card.append(makeButton('+ ต่อคิว','เพิ่มเพลง ' + song.title + ' ลงคิว',() => addSong(song),'primary song-add'));
+            container.append(card);
+        });
+    }
+    function closeSearchResults(mode) { cancelSearch(mode); $(mode + '-search-panel').hidden = true; }
+    function extractVideoId(input) {
+        if (VIDEO_ID.test(input)) return input;
+        try {
+            const raw = /^https?:\/\//i.test(input) ? input : 'https://' + input;
+            const url = new URL(raw), host = url.hostname.toLowerCase();
+            let id = null;
+            if (host === 'youtu.be' || host === 'www.youtu.be') id = url.pathname.split('/')[1];
+            else if (host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtube-nocookie.com' || host.endsWith('.youtube-nocookie.com')) {
+                if (url.pathname === '/watch') id = url.searchParams.get('v');
+                else {
+                    const parts = url.pathname.split('/');
+                    if (['shorts','embed','live','v'].includes(parts[1])) id = parts[2];
                 }
-            });
-
-            APP.hostConn.on('close', () => {
-                alert('การเชื่อมต่อกับหน้าจอหลักหลุด');
-            });
-        }
-
-        function renderRemoteQueue() {
-            // Render Now Playing
-            const nowPlayingBox = document.getElementById('remote-now-playing-title');
-            if (APP.currentSong) {
-                nowPlayingBox.innerText = APP.currentSong.title;
-            } else {
-                nowPlayingBox.innerText = 'ยังไม่มีเพลงเล่น';
             }
+            return id && VIDEO_ID.test(id) ? id : null;
+        } catch (_) { return null; }
+    }
+    function addDirectUrl(mode) {
+        const input = $(mode + '-direct-url-input'); const id = extractVideoId(input.value.trim());
+        if (!id) return toast('ลิงก์ไม่ถูกต้อง รองรับ YouTube, youtu.be, Shorts, Live และ Video ID 11 ตัวอักษร');
+        if (mode === 'remote' && (!APP.hostConn || !APP.hostConn.open)) return toast('กรุณาเชื่อมต่อหน้าจอทีวีก่อน');
+        addSong({id,title:'YouTube Video (' + id + ')',channel:'Direct Link'}); input.value = '';
+    }
 
-            // Render Queue List
-            const container = document.getElementById('remote-queue-container');
-            document.getElementById('remote-queue-count').innerText = `${APP.queue.length} เพลง`;
-            container.innerHTML = '';
-
-            if (APP.queue.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-8 text-slate-500 text-xs">
-                        ยังไม่มีคิวเพลงที่เพิ่มไว้
-                    </div>`;
-                return;
-            }
-
-            APP.queue.forEach((song, idx) => {
-                const card = document.createElement('div');
-                card.className = 'glass-card p-2.5 rounded-xl flex items-center justify-between gap-2 border border-slate-700/40';
-                card.innerHTML = `
-                    <div class="flex items-center gap-2 overflow-hidden">
-                        <span class="w-5 text-center text-xs font-bold text-pink-400 font-mono">${idx + 1}</span>
-                        <img src="${song.thumbnail || 'https://via.placeholder.com/120x90'}" class="w-10 h-8 object-cover rounded flex-shrink-0">
-                        <div class="overflow-hidden">
-                            <p class="text-xs font-medium text-slate-200 truncate">${song.title}</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-1">
-                        <button onclick="remoteMoveQueue(${idx}, ${idx - 1})" ${idx === 0 ? 'disabled class="opacity-20 text-slate-500 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>
-                            <i class="fa-solid fa-chevron-up text-xs"></i>
-                        </button>
-                        <button onclick="remoteMoveQueue(${idx}, ${idx + 1})" ${idx === APP.queue.length - 1 ? 'disabled class="opacity-20 text-slate-500 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>
-                            <i class="fa-solid fa-chevron-down text-xs"></i>
-                        </button>
-                        <button onclick="remoteRemoveQueue(${idx})" class="text-red-400 hover:text-red-300 p-1">
-                            <i class="fa-solid fa-xmark text-xs"></i>
-                        </button>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function sendToHost(action) {
-            if (APP.hostConn && APP.hostConn.open) {
-                APP.hostConn.send(action);
-            } else {
-                alert('ไม่ได้เชื่อมต่อกับหน้าจอหลัก');
-            }
-        }
-
-        function remoteSkipSong() {
-            sendToHost({ type: 'SKIP' });
-        }
-
-        function remoteRemoveQueue(index) {
-            sendToHost({ type: 'REMOVE_SONG', index });
-        }
-
-        function remoteMoveQueue(fromIndex, toIndex) {
-            sendToHost({ type: 'MOVE_SONG', fromIndex, toIndex });
-        }
-
-        function addSongToRemoteQueue(song) {
-            sendToHost({ type: 'ADD_SONG', song });
-            // Show toast or highlight
-            alert(`เพิ่มเพลง "${song.title}" ลงในคิวแล้ว!`);
-        }
-
-        // ==========================================
-        // YOUTUBE SEARCH ENGINE
-        // ==========================================
-        async function executeSearch() {
-            const query = document.getElementById('remote-search-input').value.trim();
-            if (!query) return;
-
-            const resultsContainer = document.getElementById('search-results-container');
-            const wrapper = document.getElementById('search-results-wrapper');
-            wrapper.classList.remove('hidden');
-            resultsContainer.innerHTML = '<p class="text-xs text-slate-400 py-4 text-center">กำลังค้นหา...</p>';
-
-            const searchQuery = query + ' คาราโอเกะ';
-
-            if (APP.apiKey) {
-                try {
-                    const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(searchQuery)}&type=video&key=${APP.apiKey}`);
-                    const data = await response.json();
-
-                    if (data.items) {
-                        renderSearchResults(data.items.map(item => ({
-                            id: item.id.videoId,
-                            title: item.snippet.title,
-                            thumbnail: item.snippet.thumbnails.medium.url,
-                            channel: item.snippet.channelTitle
-                        })));
-                    } else {
-                        resultsContainer.innerHTML = `<p class="text-xs text-red-400 py-4 text-center">เกิดข้อผิดพลาดจาก API: ${data.error?.message || 'ไม่พบผลลัพธ์'}</p>`;
-                    }
-                } catch (e) {
-                    console.error(e);
-                    fallbackSearch(searchQuery);
-                }
-            } else {
-                // Fallback direct embed search without API Key
-                fallbackSearch(searchQuery);
-            }
-        }
-
-        function fallbackSearch(query) {
-            const resultsContainer = document.getElementById('search-results-container');
-            resultsContainer.innerHTML = `
-                <div class="p-3 bg-slate-900 rounded-xl space-y-2 text-center">
-                    <p class="text-xs text-slate-300">คุณยังไม่ได้ใส่ YouTube API Key</p>
-                    <p class="text-[11px] text-slate-400">สามารถค้นหาเพลงแล้ววางลิงก์ YouTube ด้านบน หรือกดใส่ API Key เพื่อค้นหาได้ตรงๆ</p>
-                    <button onclick="openApiKeyModal()" class="px-3 py-1 bg-amber-500/20 text-amber-300 rounded text-xs font-semibold hover:bg-amber-500/30">
-                        + เพิ่ม API Key ตอนนี้
-                    </button>
-                </div>
-            `;
-        }
-
-        function renderSearchResults(songs) {
-            const container = document.getElementById('search-results-container');
-            container.innerHTML = '';
-
-            songs.forEach(song => {
-                const card = document.createElement('div');
-                card.className = 'glass-card p-2 rounded-xl flex items-center justify-between gap-2 border border-slate-700/50 hover:border-pink-500/50 transition';
-                
-                // Clean HTML entities in title
-                const cleanTitle = document.createElement('textarea');
-                cleanTitle.innerHTML = song.title;
-                const safeTitle = cleanTitle.value;
-
-                card.innerHTML = `
-                    <div class="flex items-center gap-2.5 overflow-hidden">
-                        <img src="${song.thumbnail}" class="w-14 h-10 object-cover rounded-lg flex-shrink-0">
-                        <div class="overflow-hidden">
-                            <p class="text-xs font-semibold text-slate-100 truncate">${safeTitle}</p>
-                            <p class="text-[10px] text-slate-400 truncate">${song.channel}</p>
-                        </div>
-                    </div>
-                    <button onclick='addSongToRemoteQueue(${JSON.stringify({ id: song.id, title: safeTitle, thumbnail: song.thumbnail, channel: song.channel })})' 
-                        class="px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white font-bold text-xs rounded-xl flex-shrink-0 transition flex items-center gap-1 shadow-md">
-                        <i class="fa-solid fa-plus"></i> ต่อคิว
-                    </button>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function closeSearchResults() {
-            document.getElementById('search-results-wrapper').classList.add('hidden');
-        }
-
-        function addDirectUrl() {
-            const input = document.getElementById('direct-url-input').value.trim();
-            if (!input) return;
-
-            let videoId = input;
-            if (input.includes('v=')) {
-                videoId = input.split('v=')[1].split('&')[0];
-            } else if (input.includes('youtu.be/')) {
-                videoId = input.split('youtu.be/')[1].split('?')[0];
-            }
-
-            if (videoId) {
-                const song = {
-                    id: videoId,
-                    title: `YouTube Video (${videoId})`,
-                    thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
-                    channel: 'Direct Link'
-                };
-                addSongToRemoteQueue(song);
-                document.getElementById('direct-url-input').value = '';
-            } else {
-                alert('รูปแบบ YouTube URL ไม่ถูกต้อง');
-            }
-        }
-
-        // ==========================================
-        // MODALS HANDLER
-        // ==========================================
-        function openApiKeyModal() {
-            document.getElementById('modal-apikey').classList.remove('hidden');
-        }
-
-        function closeApiKeyModal() {
-            document.getElementById('modal-apikey').classList.add('hidden');
-        }
-
-        function saveApiKey() {
-            const key = document.getElementById('api-key-input').value.trim();
-            localStorage.setItem('mugoke_yt_key', key);
-            APP.apiKey = key;
-            closeApiKeyModal();
-            alert('บันทึก API Key เรียบร้อยแล้ว!');
-        }
+    function openModal(id,focusId) {
+        APP.lastFocus = document.activeElement; $(id).hidden = false; $(focusId).focus();
+    }
+    function closeModal(id) {
+        $(id).hidden = true;
+        if (APP.lastFocus && APP.lastFocus.isConnected) APP.lastFocus.focus();
+    }
+    function openApiKeyModal() { $('api-key-input').value = APP.apiKey; openModal('modal-apikey','api-key-input'); }
+    function closeApiKeyModal() { closeModal('modal-apikey'); }
+    function showConnectRemoteModal() { openModal('modal-connect','room-code-input'); }
+    function closeConnectModal() { closeModal('modal-connect'); }
+    function saveApiKey() {
+        APP.apiKey = $('api-key-input').value.trim(); searchCache.clear();
+        cancelSearch('host'); cancelSearch('remote');
+        try { localStorage.setItem('mugoke_yt_key',APP.apiKey); toast('บันทึก API Key บนอุปกรณ์นี้แล้ว'); }
+        catch (_) { toast('ใช้ Key ได้ในครั้งนี้ แต่เบราว์เซอร์ไม่อนุญาตให้บันทึกถาวร'); }
+        closeApiKeyModal();
+        if (APP.mode === 'remote' && $('remote-search-input').value.trim()) scheduleSuggestions();
+    }
+    function trapModalTab(event) {
+        const modal = !$('modal-apikey').hidden ? $('modal-apikey') : (!$('modal-connect').hidden ? $('modal-connect') : null);
+        if (!modal) return false;
+        const nodes = Array.from(modal.querySelectorAll('button:not(:disabled),input,a[href]')).filter(node => node.getClientRects().length);
+        const first = nodes[0], last = nodes[nodes.length-1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        return true;
+    }
     </script>
 </body>
 </html>
