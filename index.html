@@ -105,27 +105,31 @@
         #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:200; padding:12px 20px; border:1px solid #64748b; border-radius:14px; background:#1e293bf5; box-shadow:0 8px 40px #0008; max-width:90vw; width:max-content; font-size:13px; pointer-events:none; }
         #player-notice { margin-top:12px; color:#fcd34d; padding:12px; border:1px solid #a16207; border-radius:12px; font-size:13px; }
         /* Fullscreen the entire stage, not the cross-origin player. The footer has its own 10% row. */
-        #fullscreen-footer { display:none; }
-        #tv-stage.cinema { display:grid; grid-template-rows:minmax(0,9fr) minmax(0,1fr); width:100%; height:100%; border:0; border-radius:0; background:#000; }
+        #fullscreen-progress,#fullscreen-footer { display:none; }
+        #tv-stage.cinema { display:grid; grid-template-rows:minmax(0,9fr) 4px minmax(0,1fr); width:100%; height:100%; border:0; border-radius:0; background:#000; }
         #tv-stage.cinema #video-area { width:100%; height:100%; aspect-ratio:auto; }
+        #tv-stage.cinema #player-placeholder { background:#000; }
         /* Keep native YouTube controls clickable, including the Settings menu. */
         #tv-stage.cinema #youtube-player { pointer-events:auto; }
+        #tv-stage.cinema #fullscreen-progress { display:block; width:100%; height:4px; background:#000; overflow:hidden; }
+        #fullscreen-progress-bar { width:0%; height:100%; background:#fff; transition:width .25s linear; }
         .player-tools { margin-top:10px; }
         #host-player-state { color:#c4b5fd; }
         #tv-stage.theater { position:fixed; inset:0; width:100vw; height:100vh; height:100dvh; z-index:80; }
         body.theater-open { overflow:hidden; }
-        #tv-stage.cinema #fullscreen-footer { display:flex; align-items:center; gap:18px; padding:0 2vw; border-top:1px solid #553252; background:linear-gradient(100deg,#1e1230,#0f172a); min-width:0; min-height:0; overflow:hidden; }
+        #tv-stage.cinema #fullscreen-footer { display:flex; align-items:center; gap:18px; padding:0 2vw; border-top:1px solid #1e293b; background:#000; min-width:0; min-height:0; overflow:hidden; }
         .fullscreen-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:.4vh; }
         #fullscreen-current { font-size:clamp(10px,1.65vh,22px); color:#f9a8d4; }
-        #fullscreen-queue-window { overflow:hidden; width:100%; font-size:clamp(11px,2vh,27px); }
-        #fullscreen-queue-track { display:flex; width:max-content; }
+        #fullscreen-queue-window { overflow:hidden; width:100%; font-size:clamp(11px,2vh,27px); background:#000; }
+        #fullscreen-queue-track { display:flex; width:max-content; background:#000; }
         #fullscreen-queue-track span { white-space:nowrap; }
         #fullscreen-queue-track.running { animation:queue-scroll var(--scroll-duration,30s) linear infinite; }
         #fullscreen-queue-track.running span { padding-right:5vw; }
         @keyframes queue-scroll { to { transform:translateX(-50%); } }
         .fullscreen-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-        .fullscreen-actions button { font-size:clamp(10px,1.6vh,20px); padding:.6vh .7vw; border-radius:8px; line-height:1.4; }
-        .fullscreen-actions kbd { font-size:inherit; }
+        .fullscreen-actions button { font-size:clamp(10px,1.6vh,20px); padding:.6vh .7vw; border-radius:8px; line-height:1.4; background:#000; border-color:#334155; }
+        .fullscreen-actions button:hover:not(:disabled) { background:#111; }
+        .fullscreen-actions kbd { font-size:inherit; background:#000; }
         @media(prefers-reduced-motion:reduce) { #fullscreen-queue-track.running { animation:none; } #fullscreen-queue-window { overflow-x:auto; } }
         @media(max-width:1050px) { #screen-host { grid-template-columns:1fr; } .queue { max-height:360px; } }
         @media(max-width:620px) {
@@ -183,6 +187,9 @@
                             <h3>ยังไม่มีเพลงในรายการ</h3>
                             <p class="muted small">ค้นหาเพลงด้านล่าง หรือใช้มือถือกรอกรหัสห้องเพื่อเพิ่มเพลง</p>
                         </div>
+                    </div>
+                    <div id="fullscreen-progress" role="progressbar" aria-label="สถานะการเล่นเพลง" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div id="fullscreen-progress-bar"></div>
                     </div>
                     <div id="fullscreen-footer">
                         <div class="fullscreen-info">
@@ -334,7 +341,7 @@
         queue:[], currentSong:null, youtubePlayer:null, playerReady:false,
         apiKey:readKey(), revision:0, connectTimer:null, roomAttempts:0,
         toastTimer:null, shortcutTime:0, lastFocus:null, pendingAdds:new Map(),
-        playbackTimer:null, resumeAt:0, playerStateText:'ยังไม่มีเพลง'
+        playbackTimer:null, progressTimer:null, resumeAt:0, playerStateText:'ยังไม่มีเพลง'
     };
     const SEARCH = {
         host:{timer:null, controller:null, version:0, composing:false},
@@ -441,9 +448,41 @@
         // Restore focus only on explicit request or song changes, never while using Settings.
         if (APP.mode === 'host') $('tv-stage').focus({preventScroll:true});
     }
+    function updatePlaybackProgress() {
+        const bar = $('fullscreen-progress-bar'), track = $('fullscreen-progress');
+        if (!bar || !track) return;
+        if (!APP.playerReady || !APP.currentSong || !APP.youtubePlayer) {
+            bar.style.width = '0%';
+            track.setAttribute('aria-valuenow', '0');
+            return;
+        }
+        let current = 0, duration = 0;
+        try {
+            current = Number(APP.youtubePlayer.getCurrentTime()) || 0;
+            duration = Number(APP.youtubePlayer.getDuration()) || 0;
+        } catch (_) {}
+        const percent = duration > 0 ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
+        bar.style.width = percent.toFixed(2) + '%';
+        track.setAttribute('aria-valuenow', String(Math.round(percent)));
+    }
+    function startProgressTimer() {
+        stopProgressTimer();
+        updatePlaybackProgress();
+        APP.progressTimer = setInterval(updatePlaybackProgress, 250);
+    }
+    function stopProgressTimer(reset = false) {
+        clearInterval(APP.progressTimer);
+        APP.progressTimer = null;
+        if (reset) {
+            const bar = $('fullscreen-progress-bar'), track = $('fullscreen-progress');
+            if (bar) bar.style.width = '0%';
+            if (track) track.setAttribute('aria-valuenow', '0');
+        }
+    }
     function loadCurrentVideo(startSeconds = 0) {
         if (!APP.playerReady || !APP.currentSong) return;
         clearTimeout(APP.playbackTimer);
+        stopProgressTimer(startSeconds === 0);
         const queueId = APP.currentSong.queueId;
         setPlaybackStatus('กำลังโหลดเพลง…');
         APP.youtubePlayer.loadVideoById({videoId:APP.currentSong.id,startSeconds});
@@ -459,6 +498,7 @@
     function reloadCurrentSong() {
         if (APP.mode !== 'host' || !APP.currentSong) return;
         clearTimeout(APP.playbackTimer);
+        stopProgressTimer(false);
         let position = 0;
         try { if (APP.playerReady) position = APP.youtubePlayer.getCurrentTime() || 0; } catch (_) {}
         APP.resumeAt = Number.isFinite(position) ? Math.max(0,position) : 0;
@@ -475,16 +515,21 @@
         focusTVControls();
     }
     function onPlayerStateChange(event) {
-        if (!APP.currentSong) { setPlaybackStatus('ยังไม่มีเพลง'); return; }
+        if (!APP.currentSong) { stopProgressTimer(true); setPlaybackStatus('ยังไม่มีเพลง'); return; }
         const labels = {'-1':'กำลังเตรียมเพลง','0':'เพลงจบแล้ว','1':'กำลังเล่น','2':'หยุดชั่วคราว','3':'กำลังบัฟเฟอร์','5':'รอเล่น'};
         setPlaybackStatus(labels[event.data] || 'กำลังเตรียมเพลง');
         if (event.data === YT.PlayerState.PLAYING) {
             clearTimeout(APP.playbackTimer);
             $('play-pause-icon').className = 'fa-solid fa-pause';
             $('player-notice').hidden = true;
+            startProgressTimer();
         } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED || event.data === YT.PlayerState.CUED) {
             $('play-pause-icon').className = 'fa-solid fa-play';
-            if (event.data === YT.PlayerState.PAUSED) clearTimeout(APP.playbackTimer);
+            if (event.data === YT.PlayerState.PAUSED) { clearTimeout(APP.playbackTimer); stopProgressTimer(false); updatePlaybackProgress(); }
+            else stopProgressTimer(true);
+        } else if (event.data === YT.PlayerState.BUFFERING) {
+            stopProgressTimer(false);
+            updatePlaybackProgress();
         }
         if (event.data === YT.PlayerState.ENDED) playNextInQueue();
     }
@@ -495,12 +540,14 @@
     }
     function restartSong() {
         if (APP.mode !== 'host' || !APP.currentSong) return;
-        if (APP.playerReady) { APP.youtubePlayer.seekTo(0, true); APP.youtubePlayer.playVideo(); }
+        stopProgressTimer(true);
+        if (APP.playerReady) { APP.youtubePlayer.seekTo(0, true); APP.youtubePlayer.playVideo(); startProgressTimer(); }
         toast('เล่นซ้ำตั้งแต่ต้น: ' + APP.currentSong.title);
     }
     function playNextInQueue() {
         if (APP.mode !== 'host') return;
         clearTimeout(APP.playbackTimer);
+        stopProgressTimer(true);
         APP.resumeAt = 0;
         APP.currentSong = APP.queue.shift() || null;
         $('player-placeholder').classList.toggle('hidden', !!APP.currentSong);
@@ -558,6 +605,7 @@
             $('fullscreen-button').innerHTML = '<i class="fa-solid fa-expand" aria-hidden="true"></i> เต็มจอ';
             if (APP.mode === 'host') $('fullscreen-button').focus();
         }
+        updatePlaybackProgress();
         requestAnimationFrame(updateQueueMarquee);
     }
     function renderFullscreenQueue() {
@@ -679,14 +727,17 @@
             const index = APP.queue.findIndex(song => song.queueId === data.queueId);
             if (index !== -1) { APP.queue.splice(index,1); commitState(); }
         } else if (data.type === 'MOVE_SONG') {
-            // Relative moves use stable IDs rather than potentially stale queue indexes.
+            // Relative and boundary moves use stable IDs rather than potentially stale queue indexes.
             const from = APP.queue.findIndex(song => song.queueId === data.queueId);
             const direction = data.direction;
-            if (from !== -1 && (direction === -1 || direction === 1)) moveQueue(from,from+direction);
+            if (from === -1) return;
+            if (direction === 'FIRST') moveQueue(from,0);
+            else if (direction === 'LAST') moveQueue(from,APP.queue.length-1);
+            else if (direction === -1 || direction === 1) moveQueue(from,from+direction);
         }
     }
     function moveQueue(from,to) {
-        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 || from >= APP.queue.length || to >= APP.queue.length) return;
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 || from >= APP.queue.length || to >= APP.queue.length || from === to) return;
         APP.queue.splice(to,0,APP.queue.splice(from,1)[0]); commitState();
     }
     function removeQueue(index) {
@@ -733,16 +784,22 @@
             info.append(title,element('p','song-subtitle truncate',song.channel || 'YouTube')); card.append(info);
             const actions = element('div','queue-actions');
             const move = direction => {
-                if (mode === 'host') { const from = APP.queue.findIndex(item => item.queueId === song.queueId); moveQueue(from,from+direction); }
-                else sendToHost({type:'MOVE_SONG',queueId:song.queueId,direction});
+                if (mode === 'host') {
+                    const from = APP.queue.findIndex(item => item.queueId === song.queueId);
+                    if (direction === 'FIRST') moveQueue(from,0);
+                    else if (direction === 'LAST') moveQueue(from,APP.queue.length-1);
+                    else moveQueue(from,from+direction);
+                } else sendToHost({type:'MOVE_SONG',queueId:song.queueId,direction});
             };
+            const first = makeButton('⤒','ย้ายไปแรกสุด',() => move('FIRST')); first.disabled = index === 0;
             const up = makeButton('▲','เลื่อนเพลงขึ้น',() => move(-1)); up.disabled = index === 0;
             const down = makeButton('▼','เลื่อนเพลงลง',() => move(1)); down.disabled = index === APP.queue.length-1;
+            const last = makeButton('⤓','ย้ายไปหลังสุด',() => move('LAST')); last.disabled = index === APP.queue.length-1;
             const remove = makeButton('✕','ลบเพลง ' + song.title,() => {
                 if (mode === 'host') removeQueue(APP.queue.findIndex(item => item.queueId === song.queueId));
                 else sendToHost({type:'REMOVE_SONG',queueId:song.queueId});
             },'danger');
-            actions.append(up,down,remove); card.append(actions); container.append(card);
+            actions.append(first,up,down,last,remove); card.append(actions); container.append(card);
         });
     }
 
